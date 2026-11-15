@@ -1,8 +1,8 @@
 # Excel 政策附件读取实验
 
-本实验对应 Issue [#9](https://github.com/Zhang-QianBin/campus-policy-agent/issues/9)，使用 openpyxl 读取本地 Excel 政策附件，输出有效单元格的文字及其工作表、坐标和合并范围，为后续检索提供可追溯的原始数据。
+本实验最初由 Issue [#9](https://github.com/Zhang-QianBin/campus-policy-agent/issues/9) 实现，并在 [#11](https://github.com/Zhang-QianBin/campus-policy-agent/issues/11) 中封装函数与命令行入口。使用 openpyxl 读取本地 Excel 政策附件，保留有效单元格的文字、工作表、坐标和合并范围。
 
-脚本入口：[scripts/excel-reading.py](../scripts/excel-reading.py)。当前为单文件命令行实验，结果只输出到终端，不写入数据库或修改原始附件。
+脚本入口：[scripts/excel_reading.py](../scripts/excel_reading.py)。支持函数调用和命令行传参，不设置默认样本路径，不写入数据库或修改原始附件。
 
 ## 环境与依赖
 
@@ -20,14 +20,14 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install openpyxl==3.1.5
 ```
 
-`json`、`pathlib` 和 `zipfile` 为 Python 标准库，无需另外安装。本说明仅列出本实验依赖，公共依赖配置由工程初始化任务统一维护。
+`argparse`、`json`、`sys`、`pathlib` 和 `zipfile` 为 Python 标准库，无需另外安装。本说明仅列出本实验依赖，公共依赖配置由工程初始化任务统一维护。
 
 ## 运行方式
 
-在项目根目录执行：
+在项目根目录执行，并传入文件路径；包含空格的路径需要加引号：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/excel-reading.py
+.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx"
 ```
 
 查看退出码：
@@ -36,33 +36,51 @@ py -3.12 -m venv .venv
 $LASTEXITCODE
 ```
 
-成功时退出码为 `0`，终端输出一个 JSON 对象；已处理的失败场景显示中文提示并以 `1` 退出，不输出结果 JSON。
+成功时退出码为 `0`，标准输出（stdout）为一个 JSON 对象；已处理的读取失败向标准错误（stderr）显示中文提示，以 `1` 退出，stdout 为空。
 
-当前没有命令行参数，需要修改脚本开头的 `excel_path` 并保存，才能切换输入文件。使用相对于项目根目录的路径，附件放在 `data/samples/<source_id>/` 下。
+路径是必填参数，省略时 argparse 显示用法并以 `2` 退出。查看帮助：
 
-### 样本一：policy-003（当前默认输入）
+```powershell
+.\.venv\Scripts\python.exe scripts/excel_reading.py --help
+```
+
+当前来源识别仍要求输入 `data/samples/<source_id>/` 下的项目相对路径，并从项目根目录运行。切换文件时只需更换命令参数，无需编辑脚本。
+
+### 样本一：policy-003
 
 [2026级本科生普通类转专业（类）转入实施细则.xlsx](../data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx)
 
-```python
-excel_path = (
-    "data/samples/policy-003/attachments/"
-    "2026级本科生普通类转专业（类）转入实施细则.xlsx"
-)
+```powershell
+.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx"
 ```
 
 ### 样本二：policy-004
 
 [卓越学院及复合型双学位选拔细则附件](../data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx)
 
-```python
-excel_path = (
-    "data/samples/policy-004/attachments/"
-    "861caa12-fe0a-4409-b03b-73d359290176.xlsx"
-)
+```powershell
+.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
 ```
 
 发布页面及附件来源见 [sources.md](sources.md)。
+
+### 在其他代码中调用
+
+从项目根目录启动的 Python 代码可以这样调用：
+
+```python
+from scripts.excel_reading import read_excel
+
+result = read_excel(
+    "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
+)
+print(result["metadata"])
+print(len(result["records"]))
+```
+
+`read_excel(file_path)` 接收相对路径字符串或 `Path`，返回下述字典。导入模块时不会读取文件或打印结果。读取函数不主动打印，也不退出进程；失败时向调用方抛出异常，由调用方决定如何处理。命令行入口 `main()` 负责接收参数、输出 JSON、显示错误及设置退出码。
+
+在项目根目录执行 `.\.venv\Scripts\python.exe` 可进入 Python 交互环境，再逐行输入上面的导入和调用示例。预期记录数为 `52`；查看 `result["records"][0]` 可核对第一条记录。输入 `exit()` 返回 PowerShell。PDF 的对应示例见 [pdf-reading.md](pdf-reading.md)。
 
 ## 输出结构
 
@@ -108,10 +126,11 @@ excel_path = (
 
 ## 失败场景与复现方法
 
-切换输入后保存脚本，再运行上面的命令。临时文件可放在 `data/samples/policy-003/attachments/` 下，复现结束后删除，避免作为正式政策样本提交；恢复脚本的正常输入路径。
+将待测文件路径作为命令参数传入。临时文件可放在 `data/samples/policy-003/attachments/` 下，复现结束后删除，避免作为正式政策样本提交；无需修改脚本。
 
 | 场景 | 复现方法 | 预期结果 |
 | --- | --- | --- |
+| 未提供路径 | 直接运行脚本，不加路径参数 | argparse 提示缺少参数，退出码为 `2` |
 | 文件不存在 | 将路径改为该目录下不存在的 `not-exist.xlsx` | 捕获 `FileNotFoundError`，提示“文件未找到”及路径，退出码为 `1` |
 | 格式不支持 | 将路径改为项目中真实存在的 PDF | 捕获 `InvalidFileException`，提示“无效的Excel文件”及具体原因，退出码为 `1` |
 | 内容不是有效 ZIP 包 | 创建普通文本文件，将完整文件名改为 `invalid.xlsx` 后作为输入 | 捕获 `BadZipFile`，提示“Excel文件损坏或无法解压”及原因，退出码为 `1` |
@@ -129,6 +148,8 @@ excel_path = (
 | --- | --- |
 | policy-003 | 正常运行，输出 540 条记录，文字均非空 |
 | policy-004 | 正常运行，输出 52 条记录，文字均非空 |
+| 函数调用与导入 | 导入无读取和打印副作用；连续调用两个样本返回各自结果 |
+| 命令行参数 | 两个样本路径均可直接传入；无路径退出码为 `2`，`--help` 退出码为 `0` |
 | policy-004 合并范围 | `Sheet2!A1` 为 `A1:E1`，`Sheet2!A6` 为 `null`；已核对全部记录的范围及位置无重复 |
 | 缺失文件、PDF 输入 | 核对对应分支，退出码均为 `1` |
 | 无效 ZIP 内容、空表、纯空白 | 使用内存构造输入验证脚本分支，均显示提示并以 `1` 退出；磁盘文件的人工复现方法见上表 |
@@ -139,7 +160,8 @@ excel_path = (
 
 ## 当前限制
 
-- 当前只读取单份本地文件，路径在脚本内配置；尚无批量导入、统一读取函数或数据库写入。
+- 每次函数调用或命令运行处理单份本地文件，尚无批量导入或数据库写入；PDF 已提供相同外层结构的 read_pdf 函数，详见对应运行说明。
+- 来源编号仍由样本目录取得，暂不支持任意目录或绝对路径的来源识别。
 - 当前记录是原始单元格数据，不是最终 RAG 检索片段。后续需要结合表头、行和合并说明组织上下文。
 - 不执行 OCR，不读取图片中的文字；字体、颜色、批注和超链接目标等未单独提取。
 - 不计算公式；当前按 openpyxl 默认方式读取，公式单元格可能输出公式字符串。
@@ -153,8 +175,9 @@ excel_path = (
 以下项目由评审人实际完成后勾选：
 
 - [ ] 在自己的环境中按说明安装依赖并运行两个样本，确认退出码、来源和输出结构。
+- [ ] 导入并调用 read_excel，确认只导入时不读取文件、不打印，连续调用结果不混用。
 - [ ] 在 policy-003 原表中选取至少两个专业，核对相关条件文字、单元格坐标及共同表头或说明的位置。
 - [ ] 核对 policy-004 的一个合并单元格与一个普通单元格，确认范围分别为字符串和 `null`。
 - [ ] 按“失败场景与复现方法”至少复现一个失败场景，确认提示和退出码。
-- [ ] 确认样本附件未修改，未提交临时测试文件、`.venv` 或缓存；测试后恢复正常输入路径。
+- [ ] 确认样本附件未修改，未提交临时测试文件、`.venv` 或缓存。
 - [ ] 在 PR 中记录实际复现结果及发现的问题，再决定是否批准。
