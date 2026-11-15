@@ -6,11 +6,29 @@ Campus Policy Agent 面向需要查询高校政策的学生，计划将分散在
 
 ## 当前状态
 
-项目处于**初始化与需求设计阶段**，正在完善项目范围和技术选型。下列功能与里程碑均为开发计划，首个可运行版本完成后将补充安装、配置和使用说明。
+项目处于**本地文档读取与检索准备阶段**，已有 PDF、Excel、Markdown 和 DOCX 读取函数及命令行入口。Markdown 已用真实通知验证，DOCX 当前使用临时构造样本验证，仍需补真实政策附件。下列问答、采集与提醒功能继续按计划开发。
 
 - **首版目标平台**：Windows。
 - **目标运行方式**：桌面客户端在本地运行，问答通过模型 API 推理；具体模型服务尚待选定。
 - **已确定的核心框架**：Python + LangChain，按需使用 LangGraph。
+
+## 本地读取实验
+
+使用 Python 3.12.10。在项目根目录创建虚拟环境并安装依赖；已有 `.venv` 时可跳过创建：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe scripts/markdown_reading.py "data/samples/policy-002/body.md"
+```
+
+各读取器支持函数调用与命令行传参，返回 `metadata/records`；路径要求与格式限制见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
+
+运行新增读取器的离线测试：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
 
 ## 项目背景
 
