@@ -31,7 +31,7 @@ def read_markdown(file_path):
 
 def main():
     parser = argparse.ArgumentParser(description="读取 Markdown 政策正文并输出 JSON。")
-    parser.add_argument("file_path", help="data/samples 下的项目相对文件路径")
+    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对文件路径")
     args = parser.parse_args()
 
     try:

@@ -63,7 +63,7 @@ def read_docx(file_path):
 
 def main():
     parser = argparse.ArgumentParser(description="读取 DOCX 政策附件并输出 JSON。")
-    parser.add_argument("file_path", help="data/samples 下的项目相对 .docx 文件路径")
+    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对 .docx 文件路径")
     args = parser.parse_args()
 
     try:

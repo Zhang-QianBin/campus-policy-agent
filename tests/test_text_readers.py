@@ -3,11 +3,12 @@ import importlib
 import io
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+from zipfile import BadZipFile
 
 from docx import Document
 
@@ -114,7 +115,6 @@ class TextReaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_docx(self.sample / "old.doc")
         path.write_bytes(b"not a docx archive")
-        from zipfile import BadZipFile
         with self.assertRaises(BadZipFile):
             read_docx(path)
 
