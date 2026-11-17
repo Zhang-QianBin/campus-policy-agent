@@ -24,7 +24,15 @@ py -3.12 -m venv .venv
 
 各读取器支持函数调用与命令行传参，返回 `metadata/records`；路径要求与格式限制见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
 
-运行新增读取器的离线测试：
+将读取结果导出为 JSON（输出文件须不存在）：
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" -o "data/processed/policy-002/body.json"
+```
+
+`-o` 与 `--output` 等价，均需提供输出路径；函数调用、加载和已有文件处理方式见 [JSON 保存与加载说明](docs/document-storage.md)。
+
+运行读取器与存储模块的离线测试：
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v

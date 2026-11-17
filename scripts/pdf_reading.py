@@ -1,6 +1,10 @@
+import argparse
+import json
 import sys
-from pypdf import PdfReader
 from pathlib import Path
+
+from pypdf import PdfReader
+
 
 def read_pdf(file_path):
     """读取样本 PDF，返回文件元数据和逐页文字记录。"""
@@ -16,24 +20,12 @@ def read_pdf(file_path):
     records = []
     reader = PdfReader(file_path)
     try:
-        page_count = reader.get_num_pages()
-
-        for page_index in range(page_count):
-            page = reader.get_page(page_index)
-            text = page.extract_text()
-
-            if text is None or text.strip() == "":
-                record = {
-                    "page": page_index + 1,
-                    "text": ""
-                }
-            else:
-                record = {
-                    "page": page_index + 1,
-                    "text": text.strip()
-                }
-
-            records.append(record)
+        for page_number, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            records.append({
+                "page": page_number,
+                "text": text.strip(),
+            })
     finally:
         reader.close()
 
@@ -46,27 +38,28 @@ def read_pdf(file_path):
     }
 
 
-
 def main():
-    import argparse
-    import json
-
-    parser = argparse.ArgumentParser(description="读取 PDF 文件并输出元数据和记录。")
-    parser.add_argument("file_path", type=str, help="PDF 文件路径")
+    parser = argparse.ArgumentParser(description="读取 PDF 政策附件并输出 JSON。")
+    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对文件路径")
     args = parser.parse_args()
 
     try:
         result = read_pdf(args.file_path)
-        for record in result["records"]:
-            if not record["text"]:
-                print(
-                    f"第 {record['page']} 页未提取到文字，请人工核对原 PDF。",
-                    file=sys.stderr,
-                )
-        print(json.dumps(result, ensure_ascii=False, indent=4))
-    except Exception as e:
-        print(f"错误: {e}", file=sys.stderr)
-        sys.exit(1)
+    except Exception as error:
+        print(f"无法读取 PDF 文件：{args.file_path}", file=sys.stderr)
+        print(f"错误信息：{error}", file=sys.stderr)
+        return 1
+
+    for record in result["records"]:
+        if not record["text"]:
+            print(
+                f"第 {record['page']} 页未提取到文字，请人工核对原 PDF。",
+                file=sys.stderr,
+            )
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -2,9 +2,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from zipfile import BadZipFile
+
 from openpyxl import load_workbook
-from openpyxl.utils.exceptions import InvalidFileException
 
 
 def read_excel(file_path):
@@ -22,12 +21,7 @@ def read_excel(file_path):
     workbook = load_workbook(file_path)
     try:
         for worksheet in workbook.worksheets:
-            for row in worksheet.iter_rows(
-                min_row=1,
-                max_row=worksheet.max_row,
-                min_col=1,
-                max_col=worksheet.max_column,
-            ):
+            for row in worksheet.iter_rows():
                 for cell in row:
                     if cell.value is not None:
                         text = str(cell.value).strip()
@@ -60,24 +54,14 @@ def read_excel(file_path):
 
 def main():
     parser = argparse.ArgumentParser(description="读取 Excel 政策附件并输出 JSON。")
-    parser.add_argument("file_path", help="data/samples 下的项目相对文件路径")
+    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对文件路径")
     args = parser.parse_args()
 
     try:
         result = read_excel(args.file_path)
-    except FileNotFoundError:
-        print(f"文件未找到: {args.file_path}", file=sys.stderr)
-        return 1
-    except InvalidFileException as error:
-        print(f"无效的Excel文件: {args.file_path}", file=sys.stderr)
-        print(f"错误信息: {error}", file=sys.stderr)
-        return 1
-    except BadZipFile as error:
-        print(f"Excel文件损坏或无法解压: {args.file_path}", file=sys.stderr)
-        print(f"错误信息: {error}", file=sys.stderr)
-        return 1
-    except ValueError as error:
-        print(error, file=sys.stderr)
+    except Exception as error:
+        print(f"无法读取 Excel 文件：{args.file_path}", file=sys.stderr)
+        print(f"错误信息：{error}", file=sys.stderr)
         return 1
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
