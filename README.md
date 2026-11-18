@@ -32,7 +32,9 @@ py -3.12 -m venv .venv
 
 `-o` 与 `--output` 等价，均需提供输出路径；函数调用、加载和已有文件处理方式见 [JSON 保存与加载说明](docs/document-storage.md)。
 
-运行读取器与存储模块的离线测试：
+样本来源（发布页面、日期、附件下载地址）统一登记在 `data/samples/sources.json`，字段与整理约定见 [来源清单说明](docs/sources.md)。
+
+运行读取器、存储模块与来源清单校验的离线测试：
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
