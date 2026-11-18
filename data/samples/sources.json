@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "source_id": "policy-001",
+      "title": "2024级本科专业培养方案",
+      "page_url": "https://i.hdu.edu.cn/mnews/_s2/b2/30/c26a45616/page.psp",
+      "category": "部门事务",
+      "department": "教务处",
+      "publisher": null,
+      "published_date": "2025-01-10",
+      "collected_date": "2026-11-09",
+      "files": [
+        {
+          "path": "body.md",
+          "role": "body",
+          "download_url": null,
+          "parse": true
+        },
+        {
+          "path": "attachments/2024级本科专业培养方案.zip",
+          "role": "archive",
+          "download_url": "https://i.hdu.edu.cn/mnews/_upload/article/files/eb/30/aa9f7e054c59b5f87c68edac9e8b/fcc1c5a2-b9e5-4502-9e71-30059256a55d.zip",
+          "parse": false
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/01-机械工程学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/02-管理学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/04计算机学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/05-自动化学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/06-理学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/07-通信工程学院2024级本科生培养方案1008.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/08-外国语学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/09-会计学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/10-经济学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/11-材料与环境工程学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/12-网络空间安全学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/13人文艺术与数字媒体学院、法学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/14-圣光及联合学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/15-卓越学院2024级本科专业培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        },
+        {
+          "path": "attachments/unpacked/2024级本科专业培养方案/16-2024级民族预科生培养方案.pdf",
+          "role": "attachment",
+          "download_url": null,
+          "parse": true,
+          "extracted_from": "attachments/2024级本科专业培养方案.zip"
+        }
+      ]
+    },
+    {
+      "source_id": "policy-002",
+      "title": "关于第42届田径运动会期间停课安排调整的通知",
+      "page_url": "https://i.hdu.edu.cn/mnews/_s2/c4/db/c50a50395/page.psp",
+      "category": "部门通知",
+      "department": "教务处",
+      "publisher": null,
+      "published_date": "2026-11-05",
+      "collected_date": "2026-11-09",
+      "files": [
+        {
+          "path": "body.md",
+          "role": "body",
+          "download_url": null,
+          "parse": true
+        }
+      ]
+    },
+    {
+      "source_id": "policy-003",
+      "title": "2026级本科生普通类转专业（类）转入实施细则",
+      "page_url": "https://jwc.hdu.edu.cn/2026/0916/c13474a300382/page.psp",
+      "category": null,
+      "department": null,
+      "publisher": "余晓敏",
+      "published_date": "2026-09-16",
+      "collected_date": "2026-11-09",
+      "files": [
+        {
+          "path": "body.md",
+          "role": "body",
+          "download_url": null,
+          "parse": true
+        },
+        {
+          "path": "attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx",
+          "role": "attachment",
+          "download_url": "https://jwc.hdu.edu.cn/_upload/article/files/5a/49/8adc77234d439fb15e7bc7c2de0b/552c4b7a-ea96-4fd0-96f8-e1bd33d65bd6.xlsx",
+          "parse": true
+        }
+      ]
+    },
+    {
+      "source_id": "policy-004",
+      "title": "2026级卓越学院校内选拔细则和复合型双学位校内选拔细则",
+      "page_url": "https://jwc.hdu.edu.cn/2026/0916/c13474a300384/page.psp",
+      "category": null,
+      "department": null,
+      "publisher": "系统管理员",
+      "published_date": "2026-09-16",
+      "collected_date": "2026-11-09",
+      "files": [
+        {
+          "path": "body.md",
+          "role": "body",
+          "download_url": null,
+          "parse": true
+        },
+        {
+          "path": "attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx",
+          "role": "attachment",
+          "download_url": "https://jwc.hdu.edu.cn/_upload/article/files/87/68/2a352fa84caf8e399efdfcdc14c1/861caa12-fe0a-4409-b03b-73d359290176.xlsx",
+          "parse": true
+        }
+      ]
+    },
+    {
+      "source_id": "policy-005",
+      "title": "关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）",
+      "page_url": "https://i.hdu.edu.cn/mnews/_s2/c1/9f/c16a49567/page.psp",
+      "category": "校内文件",
+      "department": "办公室",
+      "publisher": null,
+      "published_date": "2026-06-09",
+      "collected_date": "2026-11-09",
+      "files": [
+        {
+          "path": "body.md",
+          "role": "body",
+          "download_url": null,
+          "parse": true
+        },
+        {
+          "path": "attachments/关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）.pdf",
+          "role": "attachment",
+          "download_url": "https://i.hdu.edu.cn/mnews/_upload/article/files/43/7b/2c08f85049369708cad5126acab0/7a5b361b-ea61-497a-a565-5f03fb315c0c.pdf",
+          "parse": true
+        }
+      ]
+    }
+  ]
+}
