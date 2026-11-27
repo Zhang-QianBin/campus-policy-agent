@@ -36,7 +36,7 @@ py -3.12 -m venv .venv
 $LASTEXITCODE
 ```
 
-成功时退出码为 `0`，标准输出（stdout）为一个 JSON 对象；已处理的读取失败向标准错误（stderr）显示中文提示，以 `1` 退出，stdout 为空。
+成功时退出码为 `0`，标准输出（stdout）为记录组成的 JSON 数组。读取失败时，标准错误（stderr）显示中文提示，退出码为 `1`，stdout 为空。
 
 路径是必填参数，省略时 argparse 显示用法并以 `2` 退出。查看帮助：
 
@@ -44,7 +44,7 @@ $LASTEXITCODE
 .\.venv\Scripts\python.exe scripts/excel_reading.py --help
 ```
 
-当前来源识别仍要求输入 `data/samples/<source_id>/` 下的项目相对路径，并从项目根目录运行。切换文件时只需更换命令参数，无需编辑脚本。
+脚本接受相对路径和绝对路径。相对路径以当前工作目录为基准。已登记样本的文件级来源信息可通过 [统一读取入口](document-storage.md) 获取。
 
 ### 样本一：policy-003
 
@@ -71,52 +71,43 @@ $LASTEXITCODE
 ```python
 from scripts.excel_reading import read_excel
 
-result = read_excel(
+records = read_excel(
     "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
 )
-print(result["metadata"])
-print(len(result["records"]))
+print(len(records))
 ```
 
-`read_excel(file_path)` 接收相对路径字符串或 `Path`，返回下述字典。导入模块时不会读取文件或打印结果。读取函数不主动打印，也不退出进程；失败时向调用方抛出异常，由调用方决定如何处理。命令行入口 `main()` 负责接收参数、输出 JSON、显示错误及设置退出码。
+`read_excel(file_path)` 接收路径字符串或 `Path`，返回记录列表。导入模块时不会读取文件或打印结果。读取失败时向调用方抛出异常。命令行入口 `main()` 负责接收参数、输出 JSON、显示错误及设置退出码。
 
 四种读取脚本统一采用 `main()` 成功返回 0、读取失败返回 1，文件入口使用 `raise SystemExit(main())`。Excel 的 CLI 统一显示“无法读取 Excel 文件：”及路径，再显示“错误信息：”及具体原因；函数原始异常类型保持不变。
 
-在项目根目录执行 `.\.venv\Scripts\python.exe` 可进入 Python 交互环境，再逐行输入上面的导入和调用示例。预期记录数为 `52`；查看 `result["records"][0]` 可核对第一条记录。输入 `exit()` 返回 PowerShell。PDF 的对应示例见 [pdf-reading.md](pdf-reading.md)。
+在项目根目录执行 `.\.venv\Scripts\python.exe` 可进入 Python 交互环境，再逐行输入上面的导入和调用示例。预期记录数为 `52`，可用 `records[0]` 核对第一条记录。输入 `exit()` 返回 PowerShell。PDF 的对应示例见 [pdf-reading.md](pdf-reading.md)。
 
 ## 输出结构
 
-每份文件输出一个对象：文件级信息保存在 `metadata` 中，单元格记录保存在 `records` 中。示例取自 policy-004，以下只展示第一条记录：
+每份文件输出单元格记录列表。下面展示 policy-004 的第一条记录。
 
 ```json
-{
-  "metadata": {
-    "source_id": "policy-004",
-    "title": "861caa12-fe0a-4409-b03b-73d359290176",
-    "file_path": "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
-  },
-  "records": [
-    {
+[
+  {
+    "type": "cell",
+    "text": "2026级卓越学院校内选拔细则和复合型双学位校内选拔细则",
+    "location": {
       "sheet": "Sheet2",
       "cell": "A1",
-      "text": "2026级卓越学院校内选拔细则和复合型双学位校内选拔细则",
       "merged_range": "A1:E1"
     }
-  ]
-}
+  }
+]
 ```
 
-| 位置 | 字段 | 含义 |
-| --- | --- | --- |
-| metadata | source_id | 相对于 `data/samples` 的第一级目录名，例如 `policy-004`；表示来源记录，同一来源可能有多个附件 |
-| metadata | title | 文件名去掉扩展名，暂未识别文件内的正式标题 |
-| metadata | file_path | 相对于项目根目录的文件路径，使用 `/` 分隔 |
-| records 中每条记录 | sheet | 工作表名称 |
-| records 中每条记录 | cell | 单元格坐标，例如 `A1` |
-| records 中每条记录 | text | 单元格值转为字符串并去除首尾空白后的内容 |
-| records 中每条记录 | merged_range | 所属合并区域，例如 `A1:E1`；未合并时为 JSON `null` |
-
-文件级信息只保存一次，通过同一个结果对象追溯各条记录。Excel 使用工作表与单元格定位，不设置 PDF 页码字段。
+| 字段 | 含义 |
+| --- | --- |
+| `type` | 固定为 `cell` |
+| `text` | 单元格值转为字符串并去除首尾空白后的内容 |
+| `location.sheet` | 工作表名称 |
+| `location.cell` | 单元格坐标，例如 `A1` |
+| `location.merged_range` | 所属合并区域，例如 `A1:E1`，未合并时为 Python 的 `None` 或 JSON 的 `null` |
 
 ## 读取与清理规则
 
@@ -128,7 +119,7 @@ print(len(result["records"]))
 
 ## 失败场景与复现方法
 
-将待测文件路径作为命令参数传入。临时文件可放在 `data/samples/policy-003/attachments/` 下，复现结束后删除，避免作为正式政策样本提交；无需修改脚本。
+将待测文件路径作为命令参数传入。可以将临时文件保存在样本库之外。
 
 | 场景 | 复现方法 | 预期结果 |
 | --- | --- | --- |
@@ -162,13 +153,11 @@ print(len(result["records"]))
 
 ## 当前限制
 
-- 每次函数调用或命令运行处理单份本地文件，尚无批量导入或数据库写入；PDF 已提供相同外层结构的 read_pdf 函数，详见对应运行说明。
-- 来源编号仍由样本目录取得，暂不支持任意目录或绝对路径的来源识别。
+- 每次函数调用或命令运行处理单份本地文件。
 - 当前记录是原始单元格数据，不是最终 RAG 检索片段。后续需要结合表头、行和合并说明组织上下文。
 - 不执行 OCR，不读取图片中的文字；字体、颜色、批注和超链接目标等未单独提取。
 - 不计算公式；当前按 openpyxl 默认方式读取，公式单元格可能输出公式字符串。
 - 合并范围用于保留位置，不自动把共同条件分配给各专业。
-- `title` 只是文件名回退值，policy-004 因此仍显示 UUID；来源说明中的正式名称尚未接入。
 - 原文写“详见学院网站”等内容时保持原样；当前脚本不会继续访问网站或推断缺失要求。
 - 当前异常处理覆盖上表所列场景，不保证识别所有损坏文件或操作系统读取错误。
 
@@ -176,7 +165,7 @@ print(len(result["records"]))
 
 以下项目由评审人实际完成后勾选：
 
-- [ ] 在自己的环境中按说明安装依赖并运行两个样本，确认退出码、来源和输出结构。
+- [ ] 在自己的环境中按说明安装依赖并运行两个样本，确认退出码和输出结构。
 - [ ] 导入并调用 read_excel，确认只导入时不读取文件、不打印，连续调用结果不混用。
 - [ ] 在 policy-003 原表中选取至少两个专业，核对相关条件文字、单元格坐标及共同表头或说明的位置。
 - [ ] 核对 policy-004 的一个合并单元格与一个普通单元格，确认范围分别为字符串和 `null`。

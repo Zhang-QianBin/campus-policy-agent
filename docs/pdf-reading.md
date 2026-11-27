@@ -1,8 +1,8 @@
 # PDF 逐页读取实验
 
-本实验最初由 [Issue #6](https://github.com/Zhang-QianBin/campus-policy-agent/issues/6) 实现，并在 [#11](https://github.com/Zhang-QianBin/campus-policy-agent/issues/11) 中封装函数与命令行入口。使用 [pdf_reading.py](../scripts/pdf_reading.py) 读取单份本地 PDF，逐页提取文字并保留来源与页码。
+本实验最初由 [Issue #6](https://github.com/Zhang-QianBin/campus-policy-agent/issues/6) 实现，并在 [#11](https://github.com/Zhang-QianBin/campus-policy-agent/issues/11) 中封装函数与命令行入口。使用 [pdf_reading.py](../scripts/pdf_reading.py) 读取单份本地 PDF，逐页提取文字并保留页码。
 
-支持调用 `read_pdf(file_path)` 获取 Python 字典，或通过命令行参数指定路径、输出 JSON；不设置默认样本路径，不另存结果或修改原始 PDF。扫描件 OCR、表格结构重建和批量导出留待后续任务。
+调用 `read_pdf(file_path)` 可获取记录列表，命令行会将列表输出为 JSON 数组。已登记样本的来源信息与 JSON 保存见 [统一读取与导出](document-storage.md)。扫描件 OCR、表格结构重建和批量导出留待后续任务。
 
 ## 环境准备
 
@@ -35,11 +35,9 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf"
 ```
 
-文件路径是必填参数，更换命令参数即可切换输入，无需修改代码。样本须遵循 `data/samples/policy-NNN/` 目录约定，正文与附件的原始来源见 [来源清单](sources.md)。
+文件路径是必填参数，支持相对路径和绝对路径。相对路径按终端当前目录解析。已登记样本的发布页面和附件来源见 [来源清单](sources.md)。
 
-路径统一使用 `/`，并保持相对于项目根目录。开头不要加 `/`；相对路径按终端当前目录解析，而不是按 `scripts` 目录解析。
-
-成功时退出码为 `0`，stdout 输出一个包含 `metadata` 和 `records` 的 JSON 对象（中文可读、缩进 2）；空文字页提示写入 stderr，并保留该页记录。读取失败时，`main()` 显示“无法读取 PDF 文件：”及路径，再显示“错误信息：”及具体原因，退出码为 `1`，不输出结果 JSON。未提供路径时 argparse 显示用法，退出码为 `2`。
+成功时退出码为 `0`，stdout 输出一个 JSON 数组（中文可读，缩进 2）。空文字页保留记录，提示写入 stderr。读取失败时，`main()` 显示输入路径及具体原因，退出码为 `1`，stdout 为空。未提供路径时 argparse 显示用法，退出码为 `2`。
 
 四种读取脚本统一采用 `main()` 成功返回 0、读取失败返回 1，文件入口使用 `raise SystemExit(main())` 将返回值交给操作系统。读取函数只返回数据或抛出异常，不主动结束进程。
 
@@ -91,17 +89,16 @@ $LASTEXITCODE
 ```python
 from scripts.pdf_reading import read_pdf
 
-result = read_pdf(
+records = read_pdf(
     "data/samples/policy-001/attachments/unpacked/"
     "2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf"
 )
-print(result["metadata"])
-print(len(result["records"]))           # 当前样本为 37
-print(result["records"][18]["page"])    # 第 19 页，列表索引为 18
-print(result["records"][18]["text"][:200])
+print(len(records))                     # 当前样本为 37
+print(records[18]["location"]["page"])  # 第 19 页，列表索引为 18
+print(records[18]["text"][:200])
 ```
 
-`read_pdf(file_path)` 接收相对路径字符串或 `Path`，返回字典；只导入模块不会读取文件、打印结果或退出进程。函数读取时不主动输出业务提示，失败时抛出异常，由调用方决定如何处理；pypdf 自身仍可能输出诊断日志。函数返回前通过 `finally` 关闭已成功创建的 `reader`。
+`read_pdf(file_path)` 接收路径字符串或 `Path`，返回逐页记录列表。只导入模块不会读取文件、打印结果或退出进程。函数失败时抛出异常，由调用方处理。pypdf 可能输出诊断日志。函数通过 `finally` 关闭已成功创建的 `reader`。
 
 检查调用失败时，可由自己的代码捕获异常：
 
@@ -118,29 +115,19 @@ except FileNotFoundError as error:
 
 ## 输出字段
 
-每份文件返回一个字典：文件信息仅在 `metadata` 中保存一次，逐页文字保存在 `records` 中。结构示意如下，省略号表示实际内容，并非 JSON：
+记录列表按 PDF 文件页顺序排列。下面的示例展示第一页。
 
 ```python
-{
-    "metadata": {
-        "source_id": "policy-001",
-        "title": "03电子信息学院2024级本科专业培养方案",
-        "file_path": "data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf",
-    },
-    "records": [
-        {"page": 1, "text": "本页实际提取的文字"},
-        # 其余页面……
-    ],
-}
+[
+    {"type": "page", "text": "本页实际提取的文字", "location": {"page": 1}},
+]
 ```
 
-| 位置 | 字段 | 含义与取值规则 |
-| --- | --- | --- |
-| metadata | `source_id` | 发布记录编号，从相对于 `data/samples` 的第一级目录取得；同一发布记录下的多个附件共享此编号。 |
-| metadata | `title` | PDF 文件名去掉扩展名，这是标题回退规则，不是从 PDF 内识别的正式标题。 |
-| metadata | `file_path` | 项目根目录相对路径，使用 `/` 分隔，用于定位具体附件。 |
-| records 中每条记录 | `page` | 从 1 开始的 PDF 文件页码，未按纸面印刷页码重新编号。 |
-| records 中每条记录 | `text` | 本页提取的文字，去除首尾空白；未提取到有效文字时为 `""`。 |
+| 字段 | 含义与取值规则 |
+| --- | --- |
+| `type` | 固定为 `page` |
+| `text` | 本页提取的文字，去除首尾空白。未提取到有效文字时为 `""` |
+| `location.page` | 从 1 开始的 PDF 文件页码 |
 
 空文字页也追加记录，页码连续保留。命令行中会提示“第 N 页未提取到文字，请人工核对原 PDF。”；字符数可由调用方使用 `len(record["text"])` 获取，不作为返回字段。
 
@@ -148,7 +135,7 @@ except FileNotFoundError as error:
 
 ## 本地验证记录
 
-以下为 2026-11-15 的本地实验结果，供评审者复现对照；尚未替代同伴在独立环境中的验收。
+以下为 2026-11-15 的本地实验结果。记录结构和来源字段以本页当前调用示例及统一读取说明为准。
 
 | 场景 | 已观察结果 | 核对重点 |
 | --- | --- | --- |
@@ -167,14 +154,13 @@ except FileNotFoundError as error:
 - pypdf 提取已有文字信息，不执行 OCR。奖学金扫描件前 6 页的可见文字存储在图像中；第 7 页同时有图像和少量可提取文字。因此当前无法用该脚本获得完整奖学金正文。
 - 培养方案的表格存在断行、列顺序和数字粘连问题。当前保留文字及页码，未重建表格结构，涉及课程、学分等内容时仍需核对原件。
 - 函数保留原始读取异常，当前 CLI 使用较宽的 `except Exception` 显示错误并退出；这不能替代对不同错误原因的定位，其他系统或输入错误尚未全面验证。
-- 来源编号依赖现有样本目录结构，当前未支持任意外部路径或从文件内容识别来源编号。
-- 尚未实现结果持久化、批量导出或检索问答；扫描件未识别的部分不能作为已成功解析的知识库正文。
+- 统一入口支持单份已登记样本的 JSON 导出。批量导出和检索问答在后续任务实现。扫描件未提取到文字的部分不能作为知识库证据。
 - CLI 退出码 0 表示完成逐页提取流程，不代表全文完整；即使存在空文字页仍会返回记录并提示。`if not records` 只表示没有页记录，不能用它判断全文是否有文字。
 
 ## 同伴复现
 
 1. 获取包含本脚本与样本的分支，在自己的机器上按环境准备步骤配置依赖。
-2. 导入 read_pdf，直接调用正常样本，检查 metadata 和 records，并对照原件核对第 19 页；确认导入本身不读取文件。
+2. 导入 `read_pdf`，调用正常样本，检查记录列表并对照原件核对 `location.page` 为 19 的记录。
 3. 按命令行示例运行正常 PDF、扫描件、不存在的路径和 Excel 输入，对照上表检查 JSON、stderr 提示及退出码。
 4. 在 PR 中说明环境、运行命令、核对结果及差异。公共依赖配置与工程初始化任务协调维护，不提交临时文件或虚拟环境。
 

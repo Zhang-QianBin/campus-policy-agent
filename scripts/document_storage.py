@@ -6,9 +6,12 @@ from pathlib import Path
 from scripts.docx_reading import read_docx
 from scripts.excel_reading import read_excel
 from scripts.markdown_reading import read_markdown
+from scripts.paths import SAMPLES_DIR
 from scripts.pdf_reading import read_pdf
+from scripts.sources import find_source_file, load_sources
 
 
+DOCUMENT_SCHEMA_VERSION = 1
 READERS = {
     ".docx": read_docx,
     ".xlsx": read_excel,
@@ -18,14 +21,35 @@ READERS = {
 }
 
 
-def read_document(path):
-    """根据扩展名选择读取器，返回统一的文档结果。"""
+def read_document(path, sources=None, samples_dir=SAMPLES_DIR):
+    """查找已登记的文件，返回来源元数据和文字记录。"""
     path = Path(path)
-    reader = READERS.get(path.suffix.lower())
+    if sources is None:
+        sources = load_sources()
+    source, entry = find_source_file(path, sources, samples_dir)
+    if not entry["parse"]:
+        raise ValueError(f"文件仅留档，不参与解析：{path}")
+
+    suffix = path.suffix.lower()
+    reader = READERS.get(suffix)
     if reader is None:
         supported = ", ".join(sorted(READERS))
         raise ValueError(f"不支持的文档类型：{path.suffix}；支持：{supported}")
-    return reader(path)
+
+    source_id = source["source_id"]
+    registered_path = Path(entry["path"])
+    title = source["title"] if entry["role"] == "body" else registered_path.stem
+    file_format = "markdown" if suffix in {".md", ".markdown"} else suffix[1:]
+    return {
+        "metadata": {
+            "source_id": source_id,
+            "title": title,
+            "file_path": (Path(source_id) / registered_path).as_posix(),
+            "format": file_format,
+            "schema_version": DOCUMENT_SCHEMA_VERSION,
+        },
+        "records": reader(path),
+    }
 
 
 def save_document(result, output_path):
@@ -49,7 +73,7 @@ def load_document(file_path):
 
 def main():
     parser = argparse.ArgumentParser(description="读取文档并导出为 UTF-8 JSON 文件。")
-    parser.add_argument("input_path", type=Path, help="data/samples 下的项目相对文件路径")
+    parser.add_argument("input_path", type=Path, help="已登记样本的相对或绝对路径")
     parser.add_argument(
         "-o", "--output",
         dest="output_path",

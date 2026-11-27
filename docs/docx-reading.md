@@ -1,6 +1,6 @@
 # Word 政策附件读取
 
-[docx_reading.py](../scripts/docx_reading.py) 提供 `read_docx(file_path)` 和命令行入口，读取 `.docx` 的顶层正文段落与表格单元格，返回 `metadata/records`。函数与 [PDF](pdf-reading.md)、[Excel](excel-reading.md)、[Markdown](markdown-reading.md) 的外层结构一致。
+[docx_reading.py](../scripts/docx_reading.py) 提供 `read_docx(file_path)` 和命令行入口，读取 `.docx` 的顶层正文段落与表格单元格，返回记录列表。已登记样本的来源信息由 [统一读取入口](document-storage.md) 添加。
 
 ## 环境与依赖
 
@@ -14,7 +14,7 @@
 
 ## 命令行与函数调用
 
-当前语料没有真实 Word 政策附件。先将真实 `.docx` 放入其所属发布记录的附件目录，再把项目相对路径作为参数传入。以下路径是用法示例，需替换为实际存在的文件：
+当前语料没有真实 Word 政策附件。独立读取器接受实际存在的 DOCX 文件路径，支持相对路径和绝对路径。运行示例时替换为实际文件。
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/docx_reading.py "data/samples/policy-001/attachments/example.docx"
@@ -25,13 +25,12 @@
 ```python
 from scripts.docx_reading import read_docx
 
-# 替换为实际存在、归属于对应来源记录的 DOCX。
-result = read_docx("data/samples/policy-001/attachments/example.docx")
-print(result["metadata"])
-print(result["records"][0])
+# 替换为实际存在的 DOCX。
+records = read_docx("data/samples/policy-001/attachments/example.docx")
+print(records[0])
 ```
 
-来源识别仍要求 `data/samples/<source_id>/` 下的项目相对路径。只导入不会读取文件或打印。函数抛出异常，由调用方处理；CLI 使用必填路径参数、无默认样本，成功向 stdout 输出 JSON，失败向 stderr 显示路径及原因。
+只导入模块不会读取文件或打印。函数抛出异常，由调用方处理。CLI 使用必填路径参数，成功向 stdout 输出 JSON 数组，失败向 stderr 显示路径及原因。
 
 | 调用情况 | CLI 退出码 |
 | --- | --- |
@@ -44,20 +43,18 @@ print(result["records"][0])
 
 ## 返回字段与位置
 
-`metadata` 仅保存一次 `source_id`、文件名去扩展名得到的 `title`，以及使用 `/` 分隔的项目相对 `file_path`。
-
-`records` 中每条记录包含：
+每条记录包含 `type`、`text` 和 `location`。
 
 | 字段 | 规则 |
 | --- | --- |
 | type | paragraph 表示正文段落，table_cell 表示表格单元格 |
-| block | 在顶层段落与表格序列中的位置，从 1 开始；空白块仍占位置 |
 | text | 去除首尾空白后的文字；空白记录跳过，内部换行保留 |
-| table | 仅表格记录有此字段，顶层表格序号，从 1 开始 |
-| row | 仅表格记录有此字段，行号，从 1 开始 |
-| column | 仅表格记录有此字段，表格网格列号，从 1 开始 |
+| location.block | 在顶层段落与表格序列中的位置，从 1 开始，空白块仍占位置 |
+| location.table | 仅表格记录有此字段，顶层表格序号，从 1 开始 |
+| location.row | 仅表格记录有此字段，行号，从 1 开始 |
+| location.column | 仅表格记录有此字段，表格网格列号，从 1 开始 |
 
-例如，一个段落、一个表格、再一个段落，其块位置依次为 1、2、3。表格内所有单元格共享 block=2，并通过行列进一步定位。Word 记录不添加未经实际布局计算的页码。
+一个段落、一个表格、再一个段落的块位置依次为 1、2、3。表格内的单元格共享 `location.block=2`，并通过行列进一步定位。
 
 ## 已知限制
 
