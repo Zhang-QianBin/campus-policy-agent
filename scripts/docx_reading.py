@@ -8,18 +8,11 @@ from docx.text.paragraph import Paragraph
 
 
 def read_docx(file_path):
-    """读取 DOCX 顶层段落与表格，返回文件元数据和有位置的文字记录。"""
+    """读取 DOCX 顶层段落与表格，返回带位置的文字记录列表。"""
     docx_file = Path(file_path)
-    sample_root = Path("data/samples")
 
     if docx_file.suffix.lower() != ".docx":
         raise ValueError(f"仅支持 .docx 文件，旧版 .doc 请先另行转换：{file_path}")
-
-    metadata = {
-        "source_id": docx_file.relative_to(sample_root).parts[0],
-        "title": docx_file.stem,
-        "file_path": docx_file.as_posix(),
-    }
 
     with docx_file.open("rb") as stream:
         document = Document(stream)
@@ -32,8 +25,8 @@ def read_docx(file_path):
             if text:
                 records.append({
                     "type": "paragraph",
-                    "block": block_index,
                     "text": text,
+                    "location": {"block": block_index},
                 })
         else:
             table_index += 1
@@ -45,25 +38,24 @@ def read_docx(file_path):
                     if text:
                         records.append({
                             "type": "table_cell",
-                            "block": block_index,
-                            "table": table_index,
-                            "row": row_index,
-                            "column": column_index,
                             "text": text,
+                            "location": {
+                                "block": block_index,
+                                "table": table_index,
+                                "row": row_index,
+                                "column": column_index,
+                            },
                         })
 
     if not records:
         raise ValueError(f"Word 文档中未读取到有效文字：{file_path}")
 
-    return {
-        "metadata": metadata,
-        "records": records,
-    }
+    return records
 
 
 def main():
     parser = argparse.ArgumentParser(description="读取 DOCX 政策附件并输出 JSON。")
-    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对 .docx 文件路径")
+    parser.add_argument("file_path", type=Path, help="DOCX 文件路径")
     args = parser.parse_args()
 
     try:

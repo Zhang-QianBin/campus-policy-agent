@@ -7,16 +7,7 @@ from openpyxl import load_workbook
 
 
 def read_excel(file_path):
-    """读取样本 Excel，返回文件元数据和有效单元格记录。"""
-    excel_file = Path(file_path)
-    sample_root = Path("data/samples")
-
-    metadata = {
-        "source_id": excel_file.relative_to(sample_root).parts[0],
-        "title": excel_file.stem,
-        "file_path": excel_file.as_posix(),
-    }
-
+    """读取 Excel，返回有效单元格记录列表。"""
     records = []
     workbook = load_workbook(file_path)
     try:
@@ -28,33 +19,33 @@ def read_excel(file_path):
                         if text == "":
                             continue
 
-                        record = {
-                            "sheet": worksheet.title,
-                            "cell": cell.coordinate,
-                            "text": text,
-                            "merged_range": None,
-                        }
+                        merged_range = None
                         for region in worksheet.merged_cells.ranges:
                             if cell.coordinate in region:
-                                record["merged_range"] = str(region)
+                                merged_range = str(region)
                                 break
 
-                        records.append(record)
+                        records.append({
+                            "type": "cell",
+                            "text": text,
+                            "location": {
+                                "sheet": worksheet.title,
+                                "cell": cell.coordinate,
+                                "merged_range": merged_range,
+                            },
+                        })
     finally:
         workbook.close()
 
     if not records:
         raise ValueError(f"工作簿中未读取到有效文字：{file_path}")
 
-    return {
-        "metadata": metadata,
-        "records": records,
-    }
+    return records
 
 
 def main():
     parser = argparse.ArgumentParser(description="读取 Excel 政策附件并输出 JSON。")
-    parser.add_argument("file_path", type=Path, help="data/samples 下的项目相对文件路径")
+    parser.add_argument("file_path", type=Path, help="Excel 文件路径")
     args = parser.parse_args()
 
     try:

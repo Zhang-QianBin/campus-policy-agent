@@ -36,19 +36,14 @@ class TextReaderTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def test_markdown_preserves_body_and_uses_first_nonempty_line(self):
+    def test_markdown_preserves_body_in_one_record(self):
         path = self.sample / "body.md"
         body = "政策标题\n\n第一段。\n\n    保留缩进。"
         path.write_text("\n" + body + "\n", encoding="utf-8-sig")
 
         result = read_markdown(path)
 
-        self.assertEqual(result["metadata"], {
-            "source_id": "policy-test",
-            "title": "政策标题",
-            "file_path": path.as_posix(),
-        })
-        self.assertEqual(result["records"], [{"page": None, "text": body}])
+        self.assertEqual(result, [{"type": "body", "text": body, "location": {}}])
 
     def test_markdown_rejects_empty_and_invalid_encoding(self):
         path = self.sample / "empty.md"
@@ -80,18 +75,19 @@ class TextReaderTests(unittest.TestCase):
         document.add_paragraph("办理截止时间")
         document.save(path)
 
-        result = read_docx(path)
-        records = result["records"]
+        records = read_docx(path)
 
-        self.assertEqual(result["metadata"]["title"], "policy")
-        self.assertEqual(result["metadata"]["source_id"], "policy-test")
         self.assertEqual([r["text"] for r in records], [
             "通知标题", "专业", "条件", "计算机", "绩点要求\n另有条件", "办理截止时间",
         ])
-        self.assertEqual([r["block"] for r in records], [1, 3, 3, 3, 3, 4])
+        self.assertEqual([r["location"]["block"] for r in records], [1, 3, 3, 3, 3, 4])
+        self.assertEqual(records[0], {
+            "type": "paragraph", "text": "通知标题", "location": {"block": 1},
+        })
         self.assertEqual(records[4], {
-            "type": "table_cell", "block": 3, "table": 1,
-            "row": 2, "column": 2, "text": "绩点要求\n另有条件",
+            "type": "table_cell",
+            "text": "绩点要求\n另有条件",
+            "location": {"block": 3, "table": 1, "row": 2, "column": 2},
         })
 
     def test_docx_table_only_document_and_merged_cells(self):
@@ -102,10 +98,10 @@ class TextReaderTests(unittest.TestCase):
         table.cell(1, 0).text = "0"
         document.save(path)
 
-        records = read_docx(path)["records"]
+        records = read_docx(path)
 
         self.assertEqual([r["text"] for r in records], ["合并标题", "合并标题", "0"])
-        self.assertEqual([r["column"] for r in records], [1, 2, 1])
+        self.assertEqual([r["location"]["column"] for r in records], [1, 2, 1])
 
     def test_docx_rejects_empty_unsupported_and_invalid_archive(self):
         path = self.sample / "empty.docx"
@@ -131,8 +127,8 @@ class TextReaderTests(unittest.TestCase):
                 importlib.reload(importlib.import_module(name))
         self.assertEqual(out.getvalue(), "")
         self.assertEqual(err.getvalue(), "")
-        self.assertEqual(a["records"][0]["text"], "第一份")
-        self.assertEqual(b["records"][0]["text"], "第二份")
+        self.assertEqual(a[0]["text"], "第一份")
+        self.assertEqual(b[0]["text"], "第二份")
 
     def test_cli_outputs_json_and_reports_failures(self):
         markdown_path = self.sample / "body.md"

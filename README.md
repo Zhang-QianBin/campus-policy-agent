@@ -22,9 +22,9 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts/markdown_reading.py "data/samples/policy-002/body.md"
 ```
 
-各读取器支持函数调用与命令行传参，返回 `metadata/records`；路径要求与格式限制见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
+各读取器支持函数调用与命令行传参，输出记录列表。每条记录包含 `type`、`text` 和 `location`。用法见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
 
-将读取结果导出为 JSON（输出文件须不存在）：
+统一入口 `read_document()` 按来源清单查找已登记文件，返回 `metadata` 和 `records`。命令行可以将这份结果导出为 JSON，目标文件须不存在。
 
 ```powershell
 .\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" -o "data/processed/policy-002/body.json"
