@@ -57,11 +57,17 @@ print(loaded == result)  # 预期 True
 
 | `status` | 判定 |
 | --- | --- |
-| `ok` | 提取到文字且未发现空文字页，`warnings` 为 `[]` |
-| `partial` | PDF 同时有文字页和空文字页，`records` 保留每一页 |
+| `ok` | 提取到文字，`warnings` 为 `[]` |
+| `partial` | 提取到文字，同时存在告警，例如 PDF 有空文字页或 Excel 有公式缺少缓存值 |
 | `empty` | 文件可正常读取，但完全未提取到文字。全空文字 PDF 仍保留页记录 |
 
-`warnings` 是告警列表。每一条包含供程序识别的 `code`、供人查看的 `message` 和可定位的 `location`。PDF 的每个空文字页生成一条 `empty_page`，`location` 包含 `page`。没有记录的文件生成一条 `empty_document`，`location` 为 `{}`。文件缺失、损坏、编码或格式错误仍由读取入口抛出异常。
+`warnings` 是告警列表。每一条包含供程序识别的 `code`、供人查看的 `message` 和可定位的 `location`。文件缺失、损坏、编码或格式错误由读取入口抛出异常。
+
+| `code` | 含义 | `location` |
+| --- | --- | --- |
+| `empty_page` | PDF 页未提取到文字，保留该页记录 | `page` |
+| `missing_formula_cache` | Excel 公式缺少保存的计算值，该单元格无内容记录 | `sheet`、`cell` |
+| `empty_document` | 文件没有可用文字，且没有更具体的告警 | `{}` |
 
 JSON 数据中的 null 会还原为 None。保存前先序列化，可以避免不可序列化对象导致新建的文件只写了一半；这不等同于磁盘写失败或断电情况下的原子保存保证。本轮只保存现有读取器产生的普通字典/列表/字符串等数据，不增加复杂对象的自定义编码。
 
@@ -77,4 +83,4 @@ JSON 数据中的 null 会还原为 None。保存前先序列化，可以避免�
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-测试覆盖三种状态、空文字页的告警位置、清单匹配、正文及附件标题、文件读取异常和 JSON 保存与加载。扫描 PDF 的集成测试调用统一导出命令，读回 JSON 后核对 7 条页记录和前 6 页的告警。临时数据在测试结束后清理。
+测试覆盖三种状态、空文字页和缺失公式缓存的告警位置、清单匹配、正文及附件标题、文件读取异常和 JSON 保存与加载。扫描 PDF 的集成测试调用统一导出命令，读回 JSON 后核对 7 条页记录和前 6 页的告警。临时数据在测试结束后清理。
