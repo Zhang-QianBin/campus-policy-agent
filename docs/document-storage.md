@@ -1,22 +1,30 @@
 # 文档结果 JSON 保存与加载
 
-[document_storage.py](../scripts/document_storage.py) 提供统一读取、保存与加载函数。导出器使用必填的 `-o/--output` 指定目标文件，已有输出文件不覆盖。
+[document_storage.py](../scripts/document_storage.py) 提供统一命令行，以及读取、保存和加载函数。
 
-## 命令行导出
+## 命令行
 
-在项目根目录运行，依赖使用根目录 requirements.txt：
+在项目根目录运行。依赖见根目录的 `requirements.txt`。
 
 ```powershell
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" --print
 .\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" --output "data/processed/policy-002/body.json"
 ```
 
-也可将 `--output` 写成 `-o`。输入路径是位置参数，输出路径是必填命名选项；不会自动选样本或默认覆盖文件。此接口替换开发期间的两个位置参数写法，`args.output_path` 名称保持不变。
+输入必须已登记且允许解析，可传相对路径或绝对路径。相对路径以当前工作目录为基准。`--print` 和 `-o/--output` 二选一。
 
-导出命令使用 `python -m scripts.document_storage`。输入必须已登记且允许解析，可传相对路径或绝对路径。相对输入路径以当前工作目录为基准。输出位置由调用方指定，建议放入已忽略的 `data/processed/`。
+| 模式 | 标准输出（stdout） |
+| --- | --- |
+| `--print` | 一份 UTF-8 JSON，包含元数据、记录、状态和告警 |
+| `-o/--output` | 显示“已保存”及目标路径。完整 JSON 写入指定的新文件，已有文件受覆盖保护 |
 
-写入 `ok`、`partial` 或 `empty` 的结果后，stdout 显示“已保存：”及目标路径，退出码为 0。读取或保存失败时，stderr 显示输入路径和原因，退出码为 1。参数缺失或错误时 argparse 返回 2。`--help` 查看用法，返回 0。
+两种模式的 JSON 结构相同。可读的告警文字写到标准错误流（stderr），告警详情也在 JSON 的 `warnings` 中。
 
-导出器将元数据、记录、提取状态和告警写入 JSON 文件。四个独立读取脚本在成功时将记录列表直接输出为 JSON 数组。
+| 退出码 | 含义 |
+| --- | --- |
+| `0` | 打印或保存成功，结果可以是 `ok`、`partial` 或 `empty`。显示帮助也返回 `0` |
+| `1` | 读取或输出失败，stderr 显示路径和原因 |
+| `2` | 参数用法错误，例如缺少输出选项或同时选择打印和保存 |
 
 ## 函数调用
 
@@ -83,4 +91,4 @@ JSON 数据中的 null 会还原为 None。保存前先序列化，可以避免�
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-测试覆盖三种状态、空文字页和缺失公式缓存的告警位置、清单匹配、正文及附件标题、文件读取异常和 JSON 保存与加载。扫描 PDF 的集成测试调用统一导出命令，读回 JSON 后核对 7 条页记录和前 6 页的告警。临时数据在测试结束后清理。
+测试覆盖打印与保存的 JSON 一致性、参数互斥、覆盖保护、三种状态、缺失与损坏文件。扫描 PDF 的集成测试分别打印和保存结果，核对 7 条页记录、JSON 中的 6 条告警，以及 stderr 上的对应提示。临时数据在测试结束后清理。

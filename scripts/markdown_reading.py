@@ -1,6 +1,3 @@
-import argparse
-import json
-import sys
 from pathlib import Path
 
 
@@ -16,25 +13,3 @@ def read_markdown(file_path):
         return []
 
     return [{"type": "body", "text": text, "location": {}}]
-
-
-def main():
-    parser = argparse.ArgumentParser(description="读取 Markdown 政策正文并输出 JSON。")
-    parser.add_argument("file_path", type=Path, help="Markdown 文件路径")
-    args = parser.parse_args()
-
-    try:
-        records = read_markdown(args.file_path)
-        if not records:
-            raise ValueError(f"Markdown 中未读取到有效文字：{args.file_path}")
-    except Exception as error:
-        print(f"无法读取 Markdown 文件：{args.file_path}", file=sys.stderr)
-        print(f"错误信息：{error}", file=sys.stderr)
-        return 1
-
-    print(json.dumps(records, ensure_ascii=False, indent=2))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

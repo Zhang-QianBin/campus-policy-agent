@@ -1,10 +1,7 @@
 import contextlib
 import importlib
 import io
-import json
 import os
-import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,9 +13,6 @@ from scripts.docx_reading import read_docx
 from scripts.markdown_reading import read_markdown
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
 class TextReaderTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -28,14 +22,6 @@ class TextReaderTests(unittest.TestCase):
         os.chdir(self.temporary.name)
         self.sample = Path("data/samples/policy-test")
         self.sample.mkdir(parents=True)
-
-    def run_cli(self, script, *arguments):
-        return subprocess.run(
-            [sys.executable, str(PROJECT_ROOT / "scripts" / script), *arguments],
-            capture_output=True,
-            encoding="utf-8",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-        )
 
     def test_markdown_preserves_body_in_one_record(self):
         path = self.sample / "body.md"
@@ -51,16 +37,8 @@ class TextReaderTests(unittest.TestCase):
         path.write_text(" \n\t", encoding="utf-8")
         word_path = self.sample / "empty.docx"
         Document().save(word_path)
-        for script, path, reader in [
-            ("markdown_reading.py", path, read_markdown),
-            ("docx_reading.py", word_path, read_docx),
-        ]:
-            with self.subTest(script=script):
-                self.assertEqual(reader(path), [])
-                completed = self.run_cli(script, str(path))
-                self.assertEqual(completed.returncode, 1)
-                self.assertEqual(completed.stdout, "")
-                self.assertIn("未读取到有效文字", completed.stderr)
+        self.assertEqual(read_markdown(path), [])
+        self.assertEqual(read_docx(word_path), [])
 
     def test_markdown_rejects_invalid_encoding(self):
         path = self.sample / "invalid.md"
@@ -140,33 +118,6 @@ class TextReaderTests(unittest.TestCase):
         self.assertEqual(err.getvalue(), "")
         self.assertEqual(a[0]["text"], "第一份")
         self.assertEqual(b[0]["text"], "第二份")
-
-    def test_cli_outputs_json_and_reports_failures(self):
-        markdown_path = self.sample / "body.md"
-        markdown_path.write_text("政策正文", encoding="utf-8")
-        docx_path = self.sample / "policy.docx"
-        document = Document()
-        document.add_paragraph("Word 正文")
-        document.save(docx_path)
-
-        for script, path, reader in [
-            ("markdown_reading.py", markdown_path, read_markdown),
-            ("docx_reading.py", docx_path, read_docx),
-        ]:
-            with self.subTest(script=script):
-                result = self.run_cli(script, path.as_posix())
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stderr, "")
-                self.assertEqual(json.loads(result.stdout), reader(path))
-
-                missing = self.run_cli(script, (self.sample / ("missing" + path.suffix)).as_posix())
-                self.assertEqual(missing.returncode, 1)
-                self.assertEqual(missing.stdout, "")
-                self.assertTrue(missing.stderr)
-
-                self.assertEqual(self.run_cli(script).returncode, 2)
-                self.assertEqual(self.run_cli(script, "--help").returncode, 0)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 
 本实验最初由 Issue [#9](https://github.com/Zhang-QianBin/campus-policy-agent/issues/9) 实现，并在 [#11](https://github.com/Zhang-QianBin/campus-policy-agent/issues/11) 中封装函数与命令行入口。使用 openpyxl 读取本地 Excel 政策附件，保留有效单元格的文字、工作表、坐标和合并范围。
 
-脚本入口：[scripts/excel_reading.py](../scripts/excel_reading.py)。支持函数调用和命令行传参，不设置默认样本路径，不写入数据库或修改原始附件。
+Excel 读取函数位于 [scripts/excel_reading.py](../scripts/excel_reading.py)。使用统一命令行打印或保存已登记附件的读取结果。[命令行用法](document-storage.md#命令行)
 
 ## 环境与依赖
 
@@ -17,41 +17,29 @@ py -3.12 -m venv .venv
 安装本实验所需依赖：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install openpyxl==3.1.5
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
-
-`argparse`、`json`、`sys`、`pathlib` 和 `zipfile` 为 Python 标准库，无需另外安装。本说明仅列出本实验依赖，公共依赖配置由工程初始化任务统一维护。
 
 ## 运行方式
 
-在项目根目录执行，并传入文件路径；包含空格的路径需要加引号：
+在项目根目录运行以下示例。命令接受已登记附件的相对或绝对路径，包含空格的路径需要加引号。
 
-```powershell
-.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx"
-```
+运行示例后，可以在 PowerShell 中用 `$LASTEXITCODE` 查看退出码。
 
-查看退出码：
-
-```powershell
-$LASTEXITCODE
-```
-
-成功时退出码为 `0`，标准输出（stdout）为记录组成的 JSON 数组。公式缺少缓存值的告警写到标准错误（stderr）。读取失败或没有可用记录时，stderr 显示原因，退出码为 `1`，stdout 为空。
+`--print` 向 stdout 输出完整 JSON，公式缺少缓存值的告警也写到 stderr。读取或输出出错时退出码为 `1`。若工作簿可读但没有可用记录，命令仍可输出状态为 `empty` 的结果。
 
 路径是必填参数，省略时 argparse 显示用法并以 `2` 退出。查看帮助：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/excel_reading.py --help
+.\.venv\Scripts\python.exe -m scripts.document_storage --help
 ```
-
-脚本接受相对路径和绝对路径。相对路径以当前工作目录为基准。已登记样本的文件级来源信息可通过 [统一读取入口](document-storage.md) 获取。
 
 ### 样本一：policy-003
 
 [2026级本科生普通类转专业（类）转入实施细则.xlsx](../data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-003/attachments/2026级本科生普通类转专业（类）转入实施细则.xlsx" --print
 ```
 
 ### 样本二：policy-004
@@ -59,7 +47,7 @@ $LASTEXITCODE
 [卓越学院及复合型双学位选拔细则附件](../data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/excel_reading.py "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx" --print
 ```
 
 发布页面及附件来源见 [sources.md](sources.md)。
@@ -77,15 +65,13 @@ records = read_excel(
 print(len(records))
 ```
 
-`read_excel(file_path)` 接收路径字符串或 `Path`，返回记录列表。工作簿可读但没有有效单元格时返回 `[]`。导入模块时不会读取文件或打印结果。读取失败时向调用方抛出异常。命令行入口 `main()` 负责接收参数、输出 JSON、显示错误及设置退出码。
-
-四种读取脚本统一采用 `main()` 成功返回 0、读取失败返回 1，文件入口使用 `raise SystemExit(main())`。Excel 的 CLI 统一显示“无法读取 Excel 文件：”及路径，再显示“错误信息：”及具体原因；函数原始异常类型保持不变。
+`read_excel(file_path)` 接收路径字符串或 `Path`，返回记录列表。工作簿可读但没有有效单元格时返回 `[]`。导入模块时不会读取文件或打印结果。读取失败时向调用方抛出异常。
 
 在项目根目录执行 `.\.venv\Scripts\python.exe` 可进入 Python 交互环境，再逐行输入上面的导入和调用示例。预期记录数为 `52`，可用 `records[0]` 核对第一条记录。输入 `exit()` 返回 PowerShell。PDF 的对应示例见 [pdf-reading.md](pdf-reading.md)。
 
 ## 输出结构
 
-每份文件输出单元格记录列表。下面展示 policy-004 的第一条记录。
+读取函数返回单元格记录列表。下面展示 policy-004 的第一条记录。在统一命令的完整 JSON 中，这份列表位于 `records` 字段。
 
 ```json
 [
@@ -120,25 +106,24 @@ print(len(records))
 
 遇到缺少保存值的公式时跳过该单元格，告警会指出工作表和单元格坐标。需要同时取得记录和告警时，可以调用 `read_excel_with_warnings(path)` 得到 `(records, warnings)`。统一入口会将告警写入结果 JSON。[统一读取结果说明](document-storage.md#结果结构)
 
-## 失败场景与复现方法
+## 读取函数的边界场景
 
-将待测文件路径作为命令参数传入。可以将临时文件保存在样本库之外。
+将待测文件路径传给 `read_excel()`，临时文件可以放在样本库之外。命令行的参数、错误提示和退出码见 [统一命令行说明](document-storage.md#命令行)。
 
 | 场景 | 复现方法 | 预期结果 |
 | --- | --- | --- |
-| 未提供路径 | 直接运行脚本，不加路径参数 | argparse 提示缺少参数，退出码为 `2` |
-| 文件不存在 | 将路径改为该目录下不存在的 `not-exist.xlsx` | 函数抛出 `FileNotFoundError`；CLI 提示无法读取、路径及具体原因，退出码为 `1` |
-| 格式不支持 | 将路径改为项目中真实存在的 PDF | 函数抛出 `InvalidFileException`；CLI 提示无法读取、路径及具体原因，退出码为 `1` |
-| 内容不是有效 ZIP 包 | 创建普通文本文件，将完整文件名改为 `invalid.xlsx` 后作为输入 | 函数抛出 `BadZipFile`；CLI 提示无法读取、路径及具体原因，退出码为 `1` |
-| 工作簿为空 | 用 Excel 新建并保存一份不含内容的 `.xlsx`，作为输入 | 提示“工作簿中未读取到有效文字”，退出码为 `1` |
-| 只有空白字符 | 在新建工作簿的某格输入几个空格并保存，作为输入 | 不生成空文字记录，提示没有有效文字，退出码为 `1` |
-| 数字为 0 | 在临时工作簿的 `A1` 输入数字 `0`，作为输入 | 输出 `"text": "0"`，退出码为 `0` |
+| 文件不存在 | 将路径改为该目录下不存在的 `not-exist.xlsx` | 抛出 `FileNotFoundError` |
+| 格式不支持 | 将路径改为项目中真实存在的 PDF | 抛出 `InvalidFileException` |
+| 内容不是有效 ZIP 包 | 创建普通文本文件，将完整文件名改为 `invalid.xlsx` 后作为输入 | 抛出 `BadZipFile` |
+| 工作簿为空 | 用 Excel 新建并保存一份不含内容的 `.xlsx` | 返回 `[]` |
+| 只有空白字符 | 在新建工作簿的某格输入几个空格并保存 | 返回 `[]` |
+| 数字为 0 | 在临时工作簿的 `A1` 输入数字 `0` | 单元格记录的 `text` 为 `"0"` |
 
 将文本文件改成 `.xlsx` 只用于构造无效输入，并不会把它转换成真正的 Excel 文件。`BadZipFile` 仅覆盖部分无效或损坏情况；缺少必要文件、XML 损坏等问题仍可能抛出其他异常。
 
 ## 本地验证记录
 
-验证日期：2026-11-15。以下为当前样本与脚本的本地结果，尚不代表同伴已复现或 Issue 已验收。
+以下为 2026-11-15 对样本和旧版命令行的本地验证记录。复现时使用本页的当前命令和结果结构。
 
 | 检查项 | 结果 |
 | --- | --- |
@@ -172,6 +157,6 @@ print(len(records))
 - [ ] 导入并调用 read_excel，确认只导入时不读取文件、不打印，连续调用结果不混用。
 - [ ] 在 policy-003 原表中选取至少两个专业，核对相关条件文字、单元格坐标及共同表头或说明的位置。
 - [ ] 核对 policy-004 的一个合并单元格与一个普通单元格，确认范围分别为字符串和 `null`。
-- [ ] 按“失败场景与复现方法”至少复现一个失败场景，确认提示和退出码。
+- [ ] 按“读取函数的边界场景”复现一个异常，并用统一命令核对一次输入错误的提示和退出码。
 - [ ] 确认样本附件未修改，未提交临时测试文件、`.venv` 或缓存。
 - [ ] 在 PR 中记录实际复现结果及发现的问题，再决定是否批准。

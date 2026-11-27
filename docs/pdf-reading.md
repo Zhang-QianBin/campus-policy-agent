@@ -2,7 +2,7 @@
 
 本实验最初由 [Issue #6](https://github.com/Zhang-QianBin/campus-policy-agent/issues/6) 实现，并在 [#11](https://github.com/Zhang-QianBin/campus-policy-agent/issues/11) 中封装函数与命令行入口。使用 [pdf_reading.py](../scripts/pdf_reading.py) 读取单份本地 PDF，逐页提取文字并保留页码。
 
-调用 `read_pdf(file_path)` 可获取记录列表，命令行会将列表输出为 JSON 数组。已登记样本的来源信息与 JSON 保存见 [统一读取与导出](document-storage.md)。扫描件 OCR、表格结构重建和批量导出留待后续任务。
+调用 `read_pdf(file_path)` 可获取逐页记录列表。统一命令输出已登记样本的来源信息、提取状态、记录和告警。[统一读取与导出](document-storage.md)
 
 ## 环境准备
 
@@ -15,7 +15,7 @@
 ```powershell
 py -3.12 --version
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install pypdf==7.1.0
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 核对实际运行环境：
@@ -29,22 +29,12 @@ py -3.12 -m venv .venv
 
 ## 运行与输入
 
-在项目根目录运行：
-
-```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf"
-```
-
-文件路径是必填参数，支持相对路径和绝对路径。相对路径按终端当前目录解析。已登记样本的发布页面和附件来源见 [来源清单](sources.md)。
-
-成功时退出码为 `0`，stdout 输出一个 JSON 数组（中文可读，缩进 2）。空文字页保留记录，提示写入 stderr。读取失败时，`main()` 显示输入路径及具体原因，退出码为 `1`，stdout 为空。未提供路径时 argparse 显示用法，退出码为 `2`。
-
-四种读取脚本统一采用 `main()` 成功返回 0、读取失败返回 1，文件入口使用 `raise SystemExit(main())` 将返回值交给操作系统。读取函数只返回数据或抛出异常，不主动结束进程。
+在项目根目录运行以下示例。统一入口支持已登记且允许解析的相对路径和绝对路径。`--print` 向 stdout 打印完整 UTF-8 JSON，空文字页的提示写入 stderr。[命令行用法](document-storage.md#命令行) · [来源清单](sources.md)
 
 查看帮助和退出码：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py --help
+.\.venv\Scripts\python.exe -m scripts.document_storage --help
 $LASTEXITCODE
 ```
 
@@ -55,7 +45,7 @@ $LASTEXITCODE
 [电子信息学院 2024 级本科专业培养方案](../data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-001/attachments/unpacked/2024级本科专业培养方案/03电子信息学院2024级本科专业培养方案.pdf" --print
 ```
 
 ### 扫描 PDF
@@ -63,23 +53,15 @@ $LASTEXITCODE
 [本科生奖学金评审办法](../data/samples/policy-005/attachments/关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）.pdf)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-005/attachments/关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）.pdf"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-005/attachments/关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）.pdf" --print
 ```
 
-### 不存在的文件
+### 未登记的路径
 
-使用以下路径验证缺失文件提示，不需要创建这个文件：
-
-```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-005/attachments/not-exist.pdf"
-```
-
-### 非 PDF 输入
-
-将已有 [Excel 附件](../data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx) 交给 PDF 读取器，用于验证格式错误处理；这不是 Excel 正文解析功能。
+使用以下路径验证清单查找失败，预期退出码为 `1`。
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/pdf_reading.py "data/samples/policy-004/attachments/861caa12-fe0a-4409-b03b-73d359290176.xlsx"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-005/attachments/not-exist.pdf" --print
 ```
 
 ### 在其他代码中调用
@@ -111,7 +93,7 @@ except FileNotFoundError as error:
     print("已捕获文件不存在异常：", error)
 ```
 
-直接调用函数时，空文字页保留为 `text=""`，不会自动显示人工核对提示；调用方可按需检查。命令行入口 `main()` 则会逐页输出该提示。Excel 的函数调用方式见 [excel-reading.md](excel-reading.md)。
+直接调用函数时，可检查 `text=""` 的页记录。也可将现有 Excel 附件传给 `read_pdf()` 复现格式错误。统一命令按扩展名选择读取器。[Excel 读取说明](excel-reading.md)
 
 ## 输出字段
 
@@ -129,13 +111,13 @@ except FileNotFoundError as error:
 | `text` | 本页提取的文字，去除首尾空白。未提取到有效文字时为 `""` |
 | `location.page` | 从 1 开始的 PDF 文件页码 |
 
-空文字页也追加记录，页码连续保留。独立命令行会在 stderr 提示对应页码，统一入口将该页写入 `warnings`。可读取但没有任何页的 PDF 返回 `[]`，独立命令行提示没有页记录并以 `1` 退出。
+空文字页也追加记录，页码连续保留。统一入口将该页写入 `warnings`，命令行在 stderr 提示对应页码。可读取但没有任何页的 PDF 返回 `[]`，统一命令可输出状态为 `empty` 的结果。
 
 `text` 非空仅表示提取到了部分文字，不代表该页或整份文件已完整解析；脚本目前不会自动判断少量文字是否覆盖全文。
 
 ## 本地验证记录
 
-以下为 2026-11-15 的本地实验结果。记录结构和来源字段以本页当前调用示例及统一读取说明为准。
+以下为 2026-11-15 对旧版读取器和命令行的本地实验。复现时使用本页的当前命令和结果结构。
 
 | 场景 | 已观察结果 | 核对重点 |
 | --- | --- | --- |
@@ -161,7 +143,7 @@ except FileNotFoundError as error:
 
 1. 获取包含本脚本与样本的分支，在自己的机器上按环境准备步骤配置依赖。
 2. 导入 `read_pdf`，调用正常样本，检查记录列表并对照原件核对 `location.page` 为 19 的记录。
-3. 按命令行示例运行正常 PDF、扫描件、不存在的路径和 Excel 输入，对照上表检查 JSON、stderr 提示及退出码。
+3. 按统一命令示例运行正常 PDF、扫描件和未登记路径，检查状态、页记录、stderr 提示及退出码。
 4. 在 PR 中说明环境、运行命令、核对结果及差异。公共依赖配置与工程初始化任务协调维护，不提交临时文件或虚拟环境。
 
 原始读取实验由 #6 / PR #8 交付；本次函数封装与 Excel 一起通过 PR 关联 #11。上述本地验证不代替同伴复现，是否完成验收以实际评审结果为准。

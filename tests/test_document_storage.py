@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -11,7 +13,7 @@ from pypdf import PdfWriter
 from pypdf.errors import PdfReadError
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from scripts.document_storage import READERS, load_document, read_document, save_document
+from scripts.document_storage import READERS, load_document, main, read_document, save_document
 from scripts.paths import PROJECT_ROOT
 
 
@@ -43,7 +45,7 @@ class DocumentStorageTests(unittest.TestCase):
             capture_output=True,
             encoding="utf-8",
             cwd=PROJECT_ROOT,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            env={**os.environ, "PYTHONIOENCODING": "ascii"},
         )
 
     def register_attachment(self, filename):
@@ -224,23 +226,32 @@ class DocumentStorageTests(unittest.TestCase):
         with self.assertRaises(json.JSONDecodeError):
             load_document(invalid)
 
-    def test_cli_accepts_short_and_long_output_options(self):
+    def test_cli_prints_the_same_json_as_short_and_long_output_options(self):
         expected = read_document(PROJECT_ROOT / PROJECT_BODY)
         self.assertEqual(expected["metadata"]["file_path"], "policy-002/body.md")
+        printed = self.run_cli(PROJECT_BODY, "--print")
+        self.assertEqual(printed.returncode, 0, printed.stderr)
+        self.assertEqual(printed.stderr, "")
+        self.assertIn("停课", printed.stdout)
+        printed_result = json.loads(printed.stdout)
+        self.assertEqual(printed_result, expected)
+
         for index, option in enumerate(["-o", "--output"]):
             with self.subTest(option=option):
                 target = self.directory / "output" / f"{index}.json"
                 result = self.run_cli(PROJECT_BODY, option, str(target))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stderr, "")
-                self.assertEqual(load_document(target), expected)
+                self.assertEqual(result.stdout.strip(), f"已保存：{target}")
+                self.assertEqual(load_document(target), printed_result)
 
-    def test_cli_exports_scanned_pdf_with_partial_status_and_page_warnings(self):
+    def test_cli_keeps_page_warnings_in_json_and_writes_messages_to_stderr(self):
         target = self.directory / "scan.json"
 
         completed = self.run_cli(SCANNED_PDF, "-o", str(target))
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), f"已保存：{target}")
         result = load_document(target)
         self.assertEqual(result["status"], "partial")
         self.assertEqual([record["location"]["page"] for record in result["records"]], list(range(1, 8)))
@@ -249,16 +260,51 @@ class DocumentStorageTests(unittest.TestCase):
         self.assertEqual([warning["location"]["page"] for warning in result["warnings"]], list(range(1, 7)))
         self.assertTrue(all(warning["code"] == "empty_page" for warning in result["warnings"]))
 
-    def test_cli_reports_missing_arguments_and_file_errors(self):
-        no_output = self.run_cli(PROJECT_BODY)
-        self.assertEqual(no_output.returncode, 2)
-        self.assertEqual(no_output.stdout, "")
+        printed = self.run_cli(SCANNED_PDF, "--print")
+        self.assertEqual(printed.returncode, 0, printed.stderr)
+        self.assertEqual(json.loads(printed.stdout), result)
+        for warning in result["warnings"]:
+            self.assertIn(warning["message"], completed.stderr)
+            self.assertIn(warning["message"], printed.stderr)
 
+    def test_cli_prints_empty_document_as_a_successful_result(self):
+        self.body.write_text(" \n", encoding="utf-8")
+        empty = read_document(self.body, self.sources, self.samples)
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with (
+            patch("sys.argv", ["document_storage", str(self.body), "--print"]),
+            patch("scripts.document_storage.read_document", return_value=empty) as read,
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        read.assert_called_once_with(self.body)
+        self.assertEqual(empty["status"], "empty")
+        self.assertEqual(json.loads(stdout.getvalue()), empty)
+        self.assertIn(empty["warnings"][0]["message"], stderr.getvalue())
+
+    def test_cli_requires_exactly_one_output_mode(self):
+        output = self.directory / "conflict.json"
+        for options in [(), ("--print", "-o", str(output))]:
+            with self.subTest(options=options):
+                result = self.run_cli(PROJECT_BODY, *options)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+                self.assertTrue(result.stderr)
+        self.assertFalse(output.exists())
+
+    def test_cli_reports_file_errors_and_refuses_to_overwrite(self):
         output = self.directory / "output.json"
-        unregistered = self.run_cli(str(self.body), "-o", str(output))
-        self.assertEqual(unregistered.returncode, 1)
-        self.assertEqual(unregistered.stdout, "")
-        self.assertIn("未在来源清单中登记", unregistered.stderr)
+        for options in [("--print",), ("-o", str(output))]:
+            with self.subTest(options=options):
+                unregistered = self.run_cli(str(self.body), *options)
+                self.assertEqual(unregistered.returncode, 1)
+                self.assertEqual(unregistered.stdout, "")
+                self.assertIn("未在来源清单中登记", unregistered.stderr)
         self.assertFalse(output.exists())
 
         target = self.directory / "existing.json"
@@ -269,8 +315,10 @@ class DocumentStorageTests(unittest.TestCase):
         self.assertTrue(existing.stderr)
         self.assertEqual(target.read_text(encoding="utf-8"), "existing")
 
+    def test_cli_help_lists_print_and_output_options(self):
         help_result = self.run_cli("--help")
         self.assertEqual(help_result.returncode, 0)
+        self.assertIn("--print", help_result.stdout)
         self.assertIn("--output", help_result.stdout)
 
 
