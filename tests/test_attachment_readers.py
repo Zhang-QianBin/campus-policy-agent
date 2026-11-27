@@ -20,14 +20,22 @@ class AttachmentReaderTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
 
-    def make_blank_pdf(self):
+    def make_blank_pdf(self, page_count=2):
         path = self.directory / "blank.pdf"
         writer = PdfWriter()
-        for _ in range(2):
+        for _ in range(page_count):
             writer.add_blank_page(width=72, height=72)
         with path.open("wb") as stream:
             writer.write(stream)
         return path
+
+    def run_cli(self, script, path):
+        return subprocess.run(
+            [sys.executable, str(PROJECT_ROOT / "scripts" / script), str(path)],
+            capture_output=True,
+            encoding="utf-8",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        )
 
     def test_pdf_preserves_original_page_numbers_including_empty_pages(self):
         path = self.make_blank_pdf()
@@ -39,17 +47,34 @@ class AttachmentReaderTests(unittest.TestCase):
 
     def test_pdf_cli_prints_records_and_warns_on_stderr(self):
         path = self.make_blank_pdf()
-        result = subprocess.run(
-            [sys.executable, str(PROJECT_ROOT / "scripts" / "pdf_reading.py"), str(path)],
-            capture_output=True,
-            encoding="utf-8",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-        )
+        result = self.run_cli("pdf_reading.py", path)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([record["location"]["page"] for record in json.loads(result.stdout)], [1, 2])
         self.assertIn("第 1 页未提取到文字", result.stderr)
         self.assertIn("第 2 页未提取到文字", result.stderr)
+
+    def test_pdf_with_no_pages_returns_no_records_and_cli_reports_no_pages(self):
+        path = self.make_blank_pdf(page_count=0)
+
+        self.assertEqual(read_pdf(path), [])
+        result = self.run_cli("pdf_reading.py", path)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("没有页记录", result.stderr)
+
+    def test_empty_excel_returns_no_records_and_cli_reports_no_text(self):
+        path = self.directory / "empty.xlsx"
+        workbook = Workbook()
+        workbook.active["A1"] = "   "
+        workbook.save(path)
+        workbook.close()
+
+        self.assertEqual(read_excel(path), [])
+        result = self.run_cli("excel_reading.py", path)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("未读取到有效文字", result.stderr)
 
     def test_excel_preserves_sheet_order_coordinates_and_merged_range(self):
         path = self.directory / "policy.xlsx"

@@ -37,9 +37,6 @@ def read_excel(file_path):
     finally:
         workbook.close()
 
-    if not records:
-        raise ValueError(f"工作簿中未读取到有效文字：{file_path}")
-
     return records
 
 
@@ -49,13 +46,15 @@ def main():
     args = parser.parse_args()
 
     try:
-        result = read_excel(args.file_path)
+        records = read_excel(args.file_path)
+        if not records:
+            raise ValueError(f"工作簿中未读取到有效文字：{args.file_path}")
     except Exception as error:
         print(f"无法读取 Excel 文件：{args.file_path}", file=sys.stderr)
         print(f"错误信息：{error}", file=sys.stderr)
         return 1
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps(records, ensure_ascii=False, indent=2))
     return 0
 
 

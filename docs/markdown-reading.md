@@ -43,7 +43,7 @@ print(records[0]["text"])
 
 - 真实样本的 `text` 保留通知正文及其中的标题行。[policy-002/body.md](../data/samples/policy-002/body.md)
 - 不存在路径：传入 `data/samples/policy-002/not-exist.md`，函数抛出 FileNotFoundError，CLI 提示后以 1 退出。
-- 空文件或只有空白：函数抛出 ValueError，不产生伪造的成功正文。
+- 空文件或只有空白时，函数返回 `[]`。独立命令行提示未读取到有效文字，退出码为 `1`。已登记文件经统一入口读取时，状态为 `empty`。
 - 非 UTF-8 内容：函数抛出 UnicodeDecodeError，不使用忽略错误的方式丢弃字节。
 - 不支持的扩展名：函数抛出 ValueError，不将 PDF 或 Excel 当作 Markdown 读取。
 

@@ -7,11 +7,19 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from pypdf import PdfWriter
+from pypdf.errors import PdfReadError
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
 from scripts.document_storage import READERS, load_document, read_document, save_document
 from scripts.paths import PROJECT_ROOT
 
 
 PROJECT_BODY = "data/samples/policy-002/body.md"
+SCANNED_PDF = (
+    "data/samples/policy-005/attachments/"
+    "关于印发《杭州电子科技大学本科生奖学金评审办法》的通知（杭电学〔2026〕79号）.pdf"
+)
 
 
 class DocumentStorageTests(unittest.TestCase):
@@ -38,6 +46,12 @@ class DocumentStorageTests(unittest.TestCase):
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
+    def register_attachment(self, filename):
+        self.sources["sources"][0]["files"].append({
+            "path": filename, "role": "attachment", "parse": True,
+        })
+        return self.body.with_name(filename)
+
     def test_registered_absolute_path_uses_manifest_title_and_sample_relative_path(self):
         result = read_document(self.body.resolve(), self.sources, self.samples)
 
@@ -46,12 +60,87 @@ class DocumentStorageTests(unittest.TestCase):
             "title": "清单里的发布标题",
             "file_path": "policy-test/body.md",
             "format": "markdown",
-            "schema_version": 1,
+            "schema_version": 2,
         })
         self.assertIs(type(result["metadata"]["schema_version"]), int)
         self.assertEqual(result["records"], [
             {"type": "body", "text": "# 正文标题\n\n中文正文。", "location": {}},
         ])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["warnings"], [])
+
+    def test_whitespace_markdown_returns_empty_with_file_warning(self):
+        self.body.write_text(" \n\t", encoding="utf-8")
+
+        result = read_document(self.body, self.sources, self.samples)
+
+        self.assertEqual(result["status"], "empty")
+        self.assertEqual(result["records"], [])
+        self.assertEqual(len(result["warnings"]), 1)
+        warning = result["warnings"][0]
+        self.assertEqual(set(warning), {"code", "message", "location"})
+        self.assertEqual(warning["code"], "empty_document")
+        self.assertEqual(warning["location"], {})
+        self.assertTrue(warning["message"])
+        target = self.directory / "empty.json"
+        save_document(result, target)
+        self.assertEqual(load_document(target), result)
+
+    def test_pdf_status_tracks_text_pages_and_preserves_empty_pages(self):
+        path = self.register_attachment("pages.pdf")
+        cases = [
+            ((True,), "ok", []),
+            ((False, True, False), "partial", [1, 3]),
+            ((False, False), "empty", [1, 2]),
+        ]
+        for text_pages, status, empty_pages in cases:
+            with self.subTest(text_pages=text_pages):
+                writer = PdfWriter()
+                for has_text in text_pages:
+                    page = writer.add_blank_page(width=72, height=72)
+                    if has_text:
+                        # Minimal text layer using a standard PDF font.
+                        page[NameObject("/Resources")] = DictionaryObject({
+                            NameObject("/Font"): DictionaryObject({
+                                NameObject("/F1"): DictionaryObject({
+                                    NameObject("/Type"): NameObject("/Font"),
+                                    NameObject("/Subtype"): NameObject("/Type1"),
+                                    NameObject("/BaseFont"): NameObject("/Helvetica"),
+                                }),
+                            }),
+                        })
+                        contents = DecodedStreamObject()
+                        contents.set_data(b"BT /F1 12 Tf 10 10 Td (Policy text) Tj ET")
+                        page.replace_contents(contents)
+                with path.open("wb") as output:
+                    writer.write(output)
+
+                result = read_document(path, self.sources, self.samples)
+
+                self.assertEqual(result["status"], status)
+                self.assertEqual(result["records"], [
+                    {
+                        "type": "page",
+                        "text": "Policy text" if has_text else "",
+                        "location": {"page": number},
+                    }
+                    for number, has_text in enumerate(text_pages, start=1)
+                ])
+                warnings = result["warnings"]
+                self.assertEqual([warning["code"] for warning in warnings], ["empty_page"] * len(empty_pages))
+                self.assertEqual([warning["location"] for warning in warnings], [
+                    {"page": page} for page in empty_pages
+                ])
+                for warning in warnings:
+                    self.assertEqual(set(warning), {"code", "message", "location"})
+                    self.assertIn(f"第 {warning['location']['page']} 页", warning["message"])
+
+    def test_registered_corrupt_pdf_remains_a_reader_error(self):
+        path = self.register_attachment("corrupt.pdf")
+        path.write_bytes(b"%PDF-1.7\n")
+
+        with self.assertRaises(PdfReadError):
+            read_document(path, self.sources, self.samples)
 
     def test_same_name_attachments_are_matched_by_path_and_markdown_alias_works(self):
         other = {"source_id": "policy-other", "title": "另一条发布", "files": []}
@@ -95,11 +184,8 @@ class DocumentStorageTests(unittest.TestCase):
         reader.assert_not_called()
 
     def test_registered_unsupported_format_is_rejected(self):
-        unsupported = self.body.with_suffix(".xls")
+        unsupported = self.register_attachment("body.xls")
         unsupported.write_bytes(b"unsupported file")
-        self.sources["sources"][0]["files"].append({
-            "path": unsupported.name, "role": "attachment", "parse": True,
-        })
         with self.assertRaisesRegex(ValueError, "不支持的文档类型"):
             read_document(unsupported, self.sources, self.samples)
 
@@ -148,6 +234,20 @@ class DocumentStorageTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stderr, "")
                 self.assertEqual(load_document(target), expected)
+
+    def test_cli_exports_scanned_pdf_with_partial_status_and_page_warnings(self):
+        target = self.directory / "scan.json"
+
+        completed = self.run_cli(SCANNED_PDF, "-o", str(target))
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        result = load_document(target)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual([record["location"]["page"] for record in result["records"]], list(range(1, 8)))
+        self.assertEqual([record["text"] for record in result["records"][:6]], [""] * 6)
+        self.assertTrue(result["records"][6]["text"])
+        self.assertEqual([warning["location"]["page"] for warning in result["warnings"]], list(range(1, 7)))
+        self.assertTrue(all(warning["code"] == "empty_page" for warning in result["warnings"]))
 
     def test_cli_reports_missing_arguments_and_file_errors(self):
         no_output = self.run_cli(PROJECT_BODY)
