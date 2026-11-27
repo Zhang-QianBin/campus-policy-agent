@@ -21,9 +21,6 @@ def read_pdf(file_path):
     finally:
         reader.close()
 
-    if not records:
-        raise ValueError(f"PDF 中没有页记录：{file_path}")
-
     return records
 
 
@@ -34,6 +31,8 @@ def main():
 
     try:
         records = read_pdf(args.file_path)
+        if not records:
+            raise ValueError(f"PDF 中没有页记录：{args.file_path}")
     except Exception as error:
         print(f"无法读取 PDF 文件：{args.file_path}", file=sys.stderr)
         print(f"错误信息：{error}", file=sys.stderr)

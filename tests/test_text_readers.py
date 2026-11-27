@@ -34,6 +34,7 @@ class TextReaderTests(unittest.TestCase):
             [sys.executable, str(PROJECT_ROOT / "scripts" / script), *arguments],
             capture_output=True,
             encoding="utf-8",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
     def test_markdown_preserves_body_in_one_record(self):
@@ -45,11 +46,24 @@ class TextReaderTests(unittest.TestCase):
 
         self.assertEqual(result, [{"type": "body", "text": body, "location": {}}])
 
-    def test_markdown_rejects_empty_and_invalid_encoding(self):
+    def test_markdown_and_docx_readers_return_no_records_for_empty_content(self):
         path = self.sample / "empty.md"
         path.write_text(" \n\t", encoding="utf-8")
-        with self.assertRaises(ValueError):
-            read_markdown(path)
+        word_path = self.sample / "empty.docx"
+        Document().save(word_path)
+        for script, path, reader in [
+            ("markdown_reading.py", path, read_markdown),
+            ("docx_reading.py", word_path, read_docx),
+        ]:
+            with self.subTest(script=script):
+                self.assertEqual(reader(path), [])
+                completed = self.run_cli(script, str(path))
+                self.assertEqual(completed.returncode, 1)
+                self.assertEqual(completed.stdout, "")
+                self.assertIn("未读取到有效文字", completed.stderr)
+
+    def test_markdown_rejects_invalid_encoding(self):
+        path = self.sample / "invalid.md"
         path.write_bytes(b"\xff\xfe\x00")
         with self.assertRaises(UnicodeDecodeError):
             read_markdown(path)
@@ -103,11 +117,8 @@ class TextReaderTests(unittest.TestCase):
         self.assertEqual([r["text"] for r in records], ["合并标题", "合并标题", "0"])
         self.assertEqual([r["location"]["column"] for r in records], [1, 2, 1])
 
-    def test_docx_rejects_empty_unsupported_and_invalid_archive(self):
-        path = self.sample / "empty.docx"
-        Document().save(path)
-        with self.assertRaises(ValueError):
-            read_docx(path)
+    def test_docx_rejects_unsupported_and_invalid_archive(self):
+        path = self.sample / "invalid.docx"
         with self.assertRaises(ValueError):
             read_docx(self.sample / "old.doc")
         path.write_bytes(b"not a docx archive")

@@ -13,7 +13,7 @@ def read_markdown(file_path):
 
     text = markdown_file.read_text(encoding="utf-8-sig").strip()
     if not text:
-        raise ValueError(f"Markdown 中未读取到有效文字：{file_path}")
+        return []
 
     return [{"type": "body", "text": text, "location": {}}]
 
@@ -24,13 +24,15 @@ def main():
     args = parser.parse_args()
 
     try:
-        result = read_markdown(args.file_path)
+        records = read_markdown(args.file_path)
+        if not records:
+            raise ValueError(f"Markdown 中未读取到有效文字：{args.file_path}")
     except Exception as error:
         print(f"无法读取 Markdown 文件：{args.file_path}", file=sys.stderr)
         print(f"错误信息：{error}", file=sys.stderr)
         return 1
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps(records, ensure_ascii=False, indent=2))
     return 0
 
 

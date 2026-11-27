@@ -11,7 +11,7 @@ from scripts.pdf_reading import read_pdf
 from scripts.sources import find_source_file, load_sources
 
 
-DOCUMENT_SCHEMA_VERSION = 1
+DOCUMENT_SCHEMA_VERSION = 2
 READERS = {
     ".docx": read_docx,
     ".xlsx": read_excel,
@@ -22,7 +22,7 @@ READERS = {
 
 
 def read_document(path, sources=None, samples_dir=SAMPLES_DIR):
-    """查找已登记的文件，返回来源元数据和文字记录。"""
+    """读取已登记的文件，返回元数据、文字记录和提取状态。"""
     path = Path(path)
     if sources is None:
         sources = load_sources()
@@ -40,6 +40,27 @@ def read_document(path, sources=None, samples_dir=SAMPLES_DIR):
     registered_path = Path(entry["path"])
     title = source["title"] if entry["role"] == "body" else registered_path.stem
     file_format = "markdown" if suffix in {".md", ".markdown"} else suffix[1:]
+    records = reader(path)
+    warnings = [
+        {
+            "code": "empty_page",
+            "message": f"第 {record['location']['page']} 页未提取到文字，请人工核对原 PDF。",
+            "location": record["location"].copy(),
+        }
+        for record in records
+        if record["type"] == "page" and not record["text"]
+    ]
+    if any(record["text"] for record in records):
+        status = "partial" if warnings else "ok"
+    else:
+        status = "empty"
+        if not warnings:
+            warnings.append({
+                "code": "empty_document",
+                "message": "未提取到文字，请核对原文件。",
+                "location": {},
+            })
+
     return {
         "metadata": {
             "source_id": source_id,
@@ -48,7 +69,9 @@ def read_document(path, sources=None, samples_dir=SAMPLES_DIR):
             "format": file_format,
             "schema_version": DOCUMENT_SCHEMA_VERSION,
         },
-        "records": reader(path),
+        "records": records,
+        "status": status,
+        "warnings": warnings,
     }
 
 
