@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from scripts.docx_reading import read_docx
-from scripts.excel_reading import read_excel
+from scripts.excel_reading import read_excel_with_warnings
 from scripts.markdown_reading import read_markdown
 from scripts.paths import SAMPLES_DIR
 from scripts.pdf_reading import read_pdf
@@ -14,7 +14,7 @@ from scripts.sources import find_source_file, load_sources
 DOCUMENT_SCHEMA_VERSION = 2
 READERS = {
     ".docx": read_docx,
-    ".xlsx": read_excel,
+    ".xlsx": read_excel_with_warnings,
     ".md": read_markdown,
     ".markdown": read_markdown,
     ".pdf": read_pdf,
@@ -40,16 +40,19 @@ def read_document(path, sources=None, samples_dir=SAMPLES_DIR):
     registered_path = Path(entry["path"])
     title = source["title"] if entry["role"] == "body" else registered_path.stem
     file_format = "markdown" if suffix in {".md", ".markdown"} else suffix[1:]
-    records = reader(path)
-    warnings = [
-        {
-            "code": "empty_page",
-            "message": f"第 {record['location']['page']} 页未提取到文字，请人工核对原 PDF。",
-            "location": record["location"].copy(),
-        }
-        for record in records
-        if record["type"] == "page" and not record["text"]
-    ]
+    if suffix == ".xlsx":
+        records, warnings = reader(path)
+    else:
+        records = reader(path)
+        warnings = [
+            {
+                "code": "empty_page",
+                "message": f"第 {record['location']['page']} 页未提取到文字，请人工核对原 PDF。",
+                "location": record["location"].copy(),
+            }
+            for record in records
+            if record["type"] == "page" and not record["text"]
+        ]
     if any(record["text"] for record in records):
         status = "partial" if warnings else "ok"
     else:

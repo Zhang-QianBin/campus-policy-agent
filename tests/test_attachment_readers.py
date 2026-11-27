@@ -4,11 +4,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
+from xml.etree import ElementTree
+from zipfile import ZipFile
 
 from openpyxl import Workbook
 from pypdf import PdfWriter
 
+from scripts.document_storage import read_document
 from scripts.excel_reading import read_excel
 from scripts.paths import PROJECT_ROOT
 from scripts.pdf_reading import read_pdf
@@ -36,6 +40,46 @@ class AttachmentReaderTests(unittest.TestCase):
             encoding="utf-8",
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
+
+    def make_excel(self, cells, cached_values=None):
+        path = self.directory / "policy-test" / "formulas.xlsx"
+        path.parent.mkdir()
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "计算"
+        for coordinate, value in cells.items():
+            sheet[coordinate] = value
+
+        if cached_values is None:
+            workbook.save(path)
+        else:
+            buffer = BytesIO()
+            workbook.save(buffer)
+            # openpyxl saves formulas without calculated values. Add known caches to the test fixture.
+            namespace = {"sheet": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            with ZipFile(buffer) as source, ZipFile(path, "w") as target:
+                for entry in source.infolist():
+                    data = source.read(entry)
+                    if entry.filename == "xl/worksheets/sheet1.xml":
+                        worksheet_xml = ElementTree.fromstring(data)
+                        for coordinate, value in cached_values.items():
+                            value_node = worksheet_xml.find(
+                                f".//sheet:c[@r='{coordinate}']/sheet:v", namespace
+                            )
+                            self.assertIsNotNone(value_node)
+                            value_node.text = str(value)
+                        data = ElementTree.tostring(worksheet_xml, encoding="utf-8")
+                    target.writestr(entry, data)
+        workbook.close()
+        return path
+
+    def read_registered_excel(self, path):
+        sources = {"sources": [{
+            "source_id": "policy-test",
+            "title": "测试政策",
+            "files": [{"path": path.name, "role": "attachment", "parse": True}],
+        }]}
+        return read_document(path, sources=sources, samples_dir=self.directory)
 
     def test_pdf_preserves_original_page_numbers_including_empty_pages(self):
         path = self.make_blank_pdf()
@@ -76,6 +120,69 @@ class AttachmentReaderTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertIn("未读取到有效文字", result.stderr)
 
+    def test_excel_uses_saved_formula_values_including_zero(self):
+        path = self.make_excel({"A1": "=1+1", "B2": "=2-2"}, {"A1": 2, "B2": 0})
+        expected = [
+            {
+                "type": "cell",
+                "text": "2",
+                "location": {"sheet": "计算", "cell": "A1", "merged_range": None},
+            },
+            {
+                "type": "cell",
+                "text": "0",
+                "location": {"sheet": "计算", "cell": "B2", "merged_range": None},
+            },
+        ]
+
+        self.assertEqual(read_excel(path), expected)
+        result = self.read_registered_excel(path)
+        self.assertEqual(result["records"], expected)
+        self.assertEqual(result["metadata"]["schema_version"], 2)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["warnings"], [])
+
+    def test_excel_reports_uncached_formula_and_keeps_other_records(self):
+        path = self.make_excel({"A1": "政策标题", "B2": "=1+1"})
+        expected = [{
+            "type": "cell",
+            "text": "政策标题",
+            "location": {"sheet": "计算", "cell": "A1", "merged_range": None},
+        }]
+
+        result = self.read_registered_excel(path)
+        self.assertEqual(result["records"], expected)
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(len(result["warnings"]), 1)
+        warning = result["warnings"][0]
+        self.assertEqual(set(warning), {"code", "message", "location"})
+        self.assertEqual(warning["code"], "missing_formula_cache")
+        self.assertEqual(warning["location"], {"sheet": "计算", "cell": "B2"})
+
+        cli = self.run_cli("excel_reading.py", path)
+        self.assertEqual(cli.returncode, 0, cli.stderr)
+        self.assertEqual(json.loads(cli.stdout), expected)
+        self.assertIn(warning["message"], cli.stderr)
+        self.assertIn("计算", warning["message"])
+        self.assertIn("B2", warning["message"])
+
+    def test_excel_with_only_uncached_formulas_is_empty(self):
+        path = self.make_excel({"A1": "=1+1"})
+
+        result = self.read_registered_excel(path)
+        self.assertEqual(result["records"], [])
+        self.assertEqual(result["status"], "empty")
+        self.assertEqual(len(result["warnings"]), 1)
+        warning = result["warnings"][0]
+        self.assertEqual(warning["code"], "missing_formula_cache")
+        self.assertEqual(warning["location"], {"sheet": "计算", "cell": "A1"})
+
+        cli = self.run_cli("excel_reading.py", path)
+        self.assertEqual(cli.returncode, 1)
+        self.assertEqual(cli.stdout, "")
+        self.assertIn(warning["message"], cli.stderr)
+        self.assertIn("未读取到有效文字", cli.stderr)
+
     def test_excel_preserves_sheet_order_coordinates_and_merged_range(self):
         path = self.directory / "policy.xlsx"
         workbook = Workbook()
@@ -86,7 +193,7 @@ class AttachmentReaderTests(unittest.TestCase):
         first["B2"] = 0
         first["C2"] = "  "
         second = workbook.create_sheet("附件")
-        second["C3"] = "=1+1"
+        second["C3"] = "第二张表"
         workbook.save(path)
         workbook.close()
 
@@ -103,7 +210,7 @@ class AttachmentReaderTests(unittest.TestCase):
             },
             {
                 "type": "cell",
-                "text": "=1+1",
+                "text": "第二张表",
                 "location": {"sheet": "附件", "cell": "C3", "merged_range": None},
             },
         ])
