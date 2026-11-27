@@ -1,7 +1,3 @@
-import json
-import os
-import subprocess
-import sys
 import tempfile
 import unittest
 from io import BytesIO
@@ -14,7 +10,6 @@ from pypdf import PdfWriter
 
 from scripts.document_storage import read_document
 from scripts.excel_reading import read_excel
-from scripts.paths import PROJECT_ROOT
 from scripts.pdf_reading import read_pdf
 
 
@@ -32,14 +27,6 @@ class AttachmentReaderTests(unittest.TestCase):
         with path.open("wb") as stream:
             writer.write(stream)
         return path
-
-    def run_cli(self, script, path):
-        return subprocess.run(
-            [sys.executable, str(PROJECT_ROOT / "scripts" / script), str(path)],
-            capture_output=True,
-            encoding="utf-8",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-        )
 
     def make_excel(self, cells, cached_values=None):
         path = self.directory / "policy-test" / "formulas.xlsx"
@@ -89,25 +76,12 @@ class AttachmentReaderTests(unittest.TestCase):
             {"type": "page", "text": "", "location": {"page": 2}},
         ])
 
-    def test_pdf_cli_prints_records_and_warns_on_stderr(self):
-        path = self.make_blank_pdf()
-        result = self.run_cli("pdf_reading.py", path)
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual([record["location"]["page"] for record in json.loads(result.stdout)], [1, 2])
-        self.assertIn("第 1 页未提取到文字", result.stderr)
-        self.assertIn("第 2 页未提取到文字", result.stderr)
-
-    def test_pdf_with_no_pages_returns_no_records_and_cli_reports_no_pages(self):
+    def test_pdf_with_no_pages_returns_no_records(self):
         path = self.make_blank_pdf(page_count=0)
 
         self.assertEqual(read_pdf(path), [])
-        result = self.run_cli("pdf_reading.py", path)
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, "")
-        self.assertIn("没有页记录", result.stderr)
 
-    def test_empty_excel_returns_no_records_and_cli_reports_no_text(self):
+    def test_empty_excel_returns_no_records(self):
         path = self.directory / "empty.xlsx"
         workbook = Workbook()
         workbook.active["A1"] = "   "
@@ -115,10 +89,6 @@ class AttachmentReaderTests(unittest.TestCase):
         workbook.close()
 
         self.assertEqual(read_excel(path), [])
-        result = self.run_cli("excel_reading.py", path)
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, "")
-        self.assertIn("未读取到有效文字", result.stderr)
 
     def test_excel_uses_saved_formula_values_including_zero(self):
         path = self.make_excel({"A1": "=1+1", "B2": "=2-2"}, {"A1": 2, "B2": 0})
@@ -159,10 +129,6 @@ class AttachmentReaderTests(unittest.TestCase):
         self.assertEqual(warning["code"], "missing_formula_cache")
         self.assertEqual(warning["location"], {"sheet": "计算", "cell": "B2"})
 
-        cli = self.run_cli("excel_reading.py", path)
-        self.assertEqual(cli.returncode, 0, cli.stderr)
-        self.assertEqual(json.loads(cli.stdout), expected)
-        self.assertIn(warning["message"], cli.stderr)
         self.assertIn("计算", warning["message"])
         self.assertIn("B2", warning["message"])
 
@@ -176,12 +142,6 @@ class AttachmentReaderTests(unittest.TestCase):
         warning = result["warnings"][0]
         self.assertEqual(warning["code"], "missing_formula_cache")
         self.assertEqual(warning["location"], {"sheet": "计算", "cell": "A1"})
-
-        cli = self.run_cli("excel_reading.py", path)
-        self.assertEqual(cli.returncode, 1)
-        self.assertEqual(cli.stdout, "")
-        self.assertIn(warning["message"], cli.stderr)
-        self.assertIn("未读取到有效文字", cli.stderr)
 
     def test_excel_preserves_sheet_order_coordinates_and_merged_range(self):
         path = self.directory / "policy.xlsx"

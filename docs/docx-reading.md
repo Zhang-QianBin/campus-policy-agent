@@ -1,6 +1,6 @@
 # Word 政策附件读取
 
-[docx_reading.py](../scripts/docx_reading.py) 提供 `read_docx(file_path)` 和命令行入口，读取 `.docx` 的顶层正文段落与表格单元格，返回记录列表。已登记样本的来源信息由 [统一读取入口](document-storage.md) 添加。
+[docx_reading.py](../scripts/docx_reading.py) 提供 `read_docx(file_path)`，读取 `.docx` 的顶层正文段落与表格单元格，返回记录列表。已登记样本的来源信息由 [统一读取入口](document-storage.md) 添加。
 
 ## 环境与依赖
 
@@ -14,10 +14,10 @@
 
 ## 命令行与函数调用
 
-当前语料没有真实 Word 政策附件。独立读取器接受实际存在的 DOCX 文件路径，支持相对路径和绝对路径。运行示例时替换为实际文件。
+当前语料没有真实 Word 政策附件。运行命令行示例前，先在来源清单中登记可解析的 DOCX 文件，再将路径替换为实际文件。[来源清单](sources.md)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/docx_reading.py "data/samples/policy-001/attachments/example.docx"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-001/attachments/example.docx" --print
 ```
 
 在项目根目录启动 Python 后也可以直接调用：
@@ -30,14 +30,7 @@ records = read_docx("data/samples/policy-001/attachments/example.docx")
 print(records[0])
 ```
 
-只导入模块不会读取文件或打印。函数抛出异常，由调用方处理。CLI 使用必填路径参数，成功向 stdout 输出 JSON 数组，失败向 stderr 显示路径及原因。
-
-| 调用情况 | CLI 退出码 |
-| --- | --- |
-| 成功读取有效文字 | 0 |
-| 缺少路径参数 | 2 |
-| --help 显示帮助 | 0 |
-| 文件不存在、不支持格式、损坏或未读取到有效文字 | 1 |
+只导入模块不会读取文件或打印。读取函数接受实际文件的相对或绝对路径，读取失败时由调用方处理异常。命令行输出完整 JSON，退出码见 [统一命令行说明](document-storage.md#命令行)。
 
 `Document(stream)` 在 with 文件上下文内加载文档，随后自动关闭输入文件流；后续遍历已加载的内容，不保存或覆盖原文件。
 
@@ -62,11 +55,11 @@ print(records[0])
 - 表格按 python-docx 提供的网格单元格读取。合并单元格可能在多个网格位置重复相同文字；本轮不去重或恢复 merged_range，不能将重复成员当成独立政策条款。
 - 当前不遍历嵌套表格，不读取页眉页脚、文本框、批注、图片或嵌入附件，不执行 OCR；不宣称覆盖 Word 中全部可见内容。
 - 保留文字与位置，不还原颜色、字体等排版含义，不计算政策适用条件或生成结论。
-- 文档可读但没有提取到文字时，函数返回 `[]`，独立命令行提示未读取到有效文字。已登记文件经统一入口读取时，状态为 `empty`。
+- 文档可读但没有提取到文字时，函数返回 `[]`。若文件已登记，统一命令可输出 `empty` 及告警。
 
 ## 验证方法
 
-当前使用临时构造的 DOCX 测试顶层段落、段落间的表格、中文和单元格换行、合并单元格的网格输出、只有表格的文档、空文档、旧格式、无效 ZIP、函数调用及 CLI。测试结束后自动清理临时文件；这些不属于真实政策语料，也不替代真实 Word 附件验收。
+当前使用临时构造的 DOCX 测试顶层段落、段落间的表格、中文和单元格换行、合并单元格的网格输出、只有表格的文档、空文档、旧格式及无效 ZIP。测试结束后自动清理临时文件。真实附件验收需在取得正式样本后进行。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v

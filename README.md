@@ -6,7 +6,7 @@ Campus Policy Agent 面向需要查询高校政策的学生，计划将分散在
 
 ## 当前状态
 
-项目处于**本地文档读取与检索准备阶段**，已有 PDF、Excel、Markdown 和 DOCX 读取函数及命令行入口。Markdown 已用真实通知验证，DOCX 当前使用临时构造样本验证，仍需补真实政策附件。下列问答、采集与提醒功能继续按计划开发。
+项目处于**本地文档读取与检索准备阶段**，已有 PDF、Excel、Markdown 和 DOCX 读取函数及统一命令行入口。Markdown 已用真实通知验证，DOCX 当前使用临时构造样本验证，仍需补真实政策附件。下列问答、采集与提醒功能继续按计划开发。
 
 - **首版目标平台**：Windows。
 - **目标运行方式**：桌面客户端在本地运行，问答通过模型 API 推理；具体模型服务尚待选定。
@@ -19,18 +19,18 @@ Campus Policy Agent 面向需要查询高校政策的学生，计划将分散在
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe scripts/markdown_reading.py "data/samples/policy-002/body.md"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" --print
 ```
 
-各读取器支持函数调用与命令行传参，输出记录列表。每条记录包含 `type`、`text` 和 `location`。用法见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
+各读取函数返回记录列表。每条记录包含 `type`、`text` 和 `location`。用法见 [Markdown 说明](docs/markdown-reading.md)、[DOCX 说明](docs/docx-reading.md)、[PDF 说明](docs/pdf-reading.md)、[Excel 说明](docs/excel-reading.md)。
 
-统一入口 `read_document()` 按来源清单查找已登记文件，返回 `metadata`、`records`、提取状态 `status` 和告警 `warnings`。命令行可以将这份结果导出为 JSON，目标文件须不存在。
+统一入口 `read_document()` 按来源清单查找已登记文件，返回 `metadata`、`records`、提取状态 `status` 和告警 `warnings`。命令行使用 `--print` 打印 JSON，或用 `-o` 将结果保存到新文件。
 
 ```powershell
 .\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" -o "data/processed/policy-002/body.json"
 ```
 
-`-o` 与 `--output` 等价，均需提供输出路径；函数调用、加载和已有文件处理方式见 [JSON 保存与加载说明](docs/document-storage.md)。
+`--print` 和 `-o/--output` 二选一。可读的告警写到标准错误流（stderr）。退出码和函数用法见 [统一读取与导出说明](docs/document-storage.md)。
 
 样本来源（发布页面、日期、附件下载地址）统一登记在 `data/samples/sources.json`，字段与整理约定见 [来源清单说明](docs/sources.md)。
 

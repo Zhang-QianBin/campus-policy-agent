@@ -1,6 +1,6 @@
 # Markdown 政策正文读取
 
-[markdown_reading.py](../scripts/markdown_reading.py) 提供 `read_markdown(file_path)` 和命令行入口。正文按整份文件保存为一条记录，读取器返回记录列表。带发布标题和来源编号的读取结果见 [统一读取与导出](document-storage.md)。
+[markdown_reading.py](../scripts/markdown_reading.py) 提供 `read_markdown(file_path)`。正文按整份文件保存为一条记录，读取器返回记录列表。命令行输出包含发布标题、来源编号和正文记录。[统一读取与导出](document-storage.md)
 
 ## 环境与运行
 
@@ -8,12 +8,10 @@
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe scripts/markdown_reading.py "data/samples/policy-002/body.md"
+.\.venv\Scripts\python.exe -m scripts.document_storage "data/samples/policy-002/body.md" --print
 ```
 
-路径是必填参数，支持绝对路径和相对路径。相对路径以当前工作目录为基准。使用 `--help` 查看帮助，缺少路径时退出码为 `2`。
-
-成功时 stdout 输出 JSON 数组，退出码为 `0`。读取失败时 stdout 为空，stderr 显示路径和具体原因，退出码为 `1`。PowerShell 中在运行后用 `$LASTEXITCODE` 查看退出码。
+命令行接受已登记文件的相对或绝对路径。`--print` 打印完整 JSON，`-o` 可将结果写入文件。PowerShell 中用 `$LASTEXITCODE` 查看退出码。[命令行用法](document-storage.md#命令行)
 
 ## 函数调用
 
@@ -42,8 +40,8 @@ print(records[0]["text"])
 ## 验证与失败场景
 
 - 真实样本的 `text` 保留通知正文及其中的标题行。[policy-002/body.md](../data/samples/policy-002/body.md)
-- 不存在路径：传入 `data/samples/policy-002/not-exist.md`，函数抛出 FileNotFoundError，CLI 提示后以 1 退出。
-- 空文件或只有空白时，函数返回 `[]`。独立命令行提示未读取到有效文字，退出码为 `1`。已登记文件经统一入口读取时，状态为 `empty`。
+- 直接调用函数读取不存在的文件会抛出 `FileNotFoundError`。用命令行传入未登记路径时，stderr 显示清单错误，退出码为 `1`。
+- 空文件或只有空白时，函数返回 `[]`。统一命令可为已登记的空文件输出 `empty` 及告警。
 - 非 UTF-8 内容：函数抛出 UnicodeDecodeError，不使用忽略错误的方式丢弃字节。
 - 不支持的扩展名：函数抛出 ValueError，不将 PDF 或 Excel 当作 Markdown 读取。
 

@@ -1,8 +1,4 @@
-import argparse
-import json
-import sys
 from contextlib import ExitStack
-from pathlib import Path
 
 from openpyxl import load_workbook
 
@@ -64,27 +60,3 @@ def read_excel_with_warnings(file_path):
                     })
 
     return records, warnings
-
-
-def main():
-    parser = argparse.ArgumentParser(description="读取 Excel 政策附件并输出 JSON。")
-    parser.add_argument("file_path", type=Path, help="Excel 文件路径")
-    args = parser.parse_args()
-
-    try:
-        records, warnings = read_excel_with_warnings(args.file_path)
-        for warning in warnings:
-            print(warning["message"], file=sys.stderr)
-        if not records:
-            raise ValueError(f"工作簿中未读取到有效文字：{args.file_path}")
-    except Exception as error:
-        print(f"无法读取 Excel 文件：{args.file_path}", file=sys.stderr)
-        print(f"错误信息：{error}", file=sys.stderr)
-        return 1
-
-    print(json.dumps(records, ensure_ascii=False, indent=2))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
